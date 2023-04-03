@@ -10,7 +10,7 @@
 #define MINI_VERSION "0.1.0"
 
 /* Helper functions */
-void die(const char *fmt, ...);
+void fail(const char *fmt, ...);
 char *read_whole_file(char *filepath);
 
 /* Type definitions */
@@ -20,6 +20,7 @@ typedef enum {
     TOKEN_EOF,
     /* Keywords */
     TOKEN_LET,
+    TOKEN_GOTO,
     TOKEN_TRUE,
     TOKEN_FALSE,
     /* Primitive Types */
@@ -38,6 +39,7 @@ typedef enum {
     TOKEN_COMMA,
     /* User-Defined */
     TOKEN_IDENTIFIER,
+    TOKEN_NUMBER,
 } token_type;
 
 typedef struct {
@@ -45,6 +47,28 @@ typedef struct {
     const char *lexeme;
     size_t length;
 } token;
+
+const char *token_strings[] = {
+    [TOKEN_UNKNOWN] = "< UNKNOWN >",
+    [TOKEN_EOF] = "< EOF >",
+    [TOKEN_LET] = "let",
+    [TOKEN_GOTO] = "goto",
+    [TOKEN_TRUE] = "true",
+    [TOKEN_FALSE] = "false",
+    [TOKEN_INT] = "int",
+    [TOKEN_BOOL] = "bool",
+    [TOKEN_EQUAL] = "=",
+    [TOKEN_PLUS] = "+",
+    [TOKEN_MINUS] = "-",
+    [TOKEN_STAR] = "*",
+    [TOKEN_SLASH] = "/",
+    [TOKEN_SEMICOLON] = ";",
+    [TOKEN_COLON] = ":",
+    [TOKEN_DOT] = ".",
+    [TOKEN_COMMA] = ",",
+    [TOKEN_IDENTIFIER] = "< IDENTIFIER >",
+    [TOKEN_NUMBER] = "< NUMBER >",
+};
 
 typedef enum {
     NODE_VARIABLE,
@@ -68,7 +92,7 @@ ast_node *ast_root = NULL;
 
 token next_token();
 bool match(token_type expected);
-void error_with_context(const char *fmt, ...);
+void fail_with_context(const char *fmt, ...);
 
 ast_node *parse_variable(token **tokens);
 ast_node *parse_function(token **tokens);
@@ -88,7 +112,7 @@ int main(int argc, char **argv) {
         char *arg = argv[i];
         if (strcmp(arg, "-o") == 0) {
             if (i + 1 >= argc) {
-                die("not enough arguments for option '%s'", arg);
+                fail("not enough arguments for option '%s'", arg);
             }
             output_filename = argv[i + 1];
             skip = true;
@@ -97,16 +121,22 @@ int main(int argc, char **argv) {
         }
     }
     if (!input_filename) {
-        die("input file is required");
+        fail("input file is required");
     }
 
     char *source_code = read_whole_file(input_filename);
     printf("outputting to: %s\n", output_filename);
 
-    token token;
-    while ((token = next_token(source_code)).type != TOKEN_EOF) {
-        printf("%d:%.*s\n", token.type, token.length, token.lexeme);
-    }
+    token token = {0};
+    do {
+        token = next_token(source_code);
+        const char *token_as_str = token_strings[token.type];
+        printf("%s", token_as_str);
+        if (token.length > 0) {
+            printf(" = %.*s", token.length, token.lexeme);
+        }
+        printf("\n");
+    } while (token.type != TOKEN_EOF);
 
     if (source_code) {
         free(source_code);
@@ -115,7 +145,7 @@ int main(int argc, char **argv) {
 }
 
 static bool is_whitespace(char c) {
-    return c == ' ' || c == '\n' || c == '\t';
+    return c == ' ' || c == '\n' || c == '\t' || c == '\r';
 }
 
 static bool is_alphabetic(char c) {
@@ -130,11 +160,18 @@ static bool is_alphanumeric(char c) {
     return is_alphabetic(c) || is_numeric(c);
 }
 
+int str_to_int(const char *s, size_t length) {
+    int n = 0;
+    for (size_t i = 0; i < length; i++) {
+        n = n * 10 + (s[i] - '0');
+    }
+    return n;
+}
+
 token next_token(char *input) {
     static char *p = NULL;
     static char *start = NULL;
-    static size_t line_no = 0;
-    static size_t col_no = 0;
+    static int line_no = 1, col_no = 1;
 
     if (!p) {
         p = input;
@@ -158,32 +195,52 @@ token next_token(char *input) {
         return next_token(input);
     }
 
-    const char *keywords[] = {
-        [TOKEN_LET] = "let",
-        [TOKEN_TRUE] = "true",
-        [TOKEN_FALSE] = "false",
-    };
-
     if (is_alphabetic(*p)) {
         while (is_alphanumeric(*p)) { p++; col_no++; }
         size_t length = (size_t)(p - start);
 
         for (token_type type = TOKEN_LET; type <= TOKEN_FALSE; type++) {
-            const char *keyword = keywords[type];
-            if (memcmp(start, keyword, length) == 0) {
-                printf("got keyword: %.*s\n", length, start);
-                return (token){.type = (token_type)type};
+            if (memcmp(start, token_strings[type], length) == 0) {
+                token keyword = (token){.type = type};
+                start = p;
+                return keyword;
             }
         }
+
+        token identifier = (token){.type = TOKEN_IDENTIFIER, .lexeme = start, .length = length};
+        start = p;
+        return identifier;
+    } else if (is_numeric(*p)) {
+        while (is_numeric(*p)) { p++; col_no++; }
+        size_t length = (size_t)(p - start);
+
+        token number = (token){.type = TOKEN_NUMBER, .lexeme = start, .length = length};
+        start = p;
+        return number;
     }
 
-    return (token){.type = TOKEN_EOF};
+    token symbol;
+    switch (*p++) {
+        case '+': symbol = (token){.type = TOKEN_PLUS}; break;
+        case '-': symbol = (token){.type = TOKEN_MINUS}; break;
+        case '*': symbol = (token){.type = TOKEN_STAR}; break;
+        case '/': symbol = (token){.type = TOKEN_SLASH}; break;
+        case '=': symbol = (token){.type = TOKEN_EQUAL}; break;
+        case ';': symbol = (token){.type = TOKEN_SEMICOLON}; break;
+        default: {
+                     fprintf(stderr, "unknown symbol at line %zu, col %zu: %c", line_no, col_no, *p); 
+                     exit(EXIT_FAILURE); 
+                 }
+    }
+
+    start = p;
+    return symbol;
 }
 
 char *read_whole_file(char *filepath) {
     FILE *f = fopen(filepath, "rb");
     if (!f) {
-        die("couldn't open file '%s'", filepath);
+        fail("couldn't open file '%s'", filepath);
     }
 
     fseek(f, 0L, SEEK_END);
@@ -192,12 +249,12 @@ char *read_whole_file(char *filepath) {
 
     char *buf = malloc(sizeof(char) * (file_size + 1));
     if (!buf) {
-        die("couldn't malloc buffer to read source code");
+        fail("couldn't malloc buffer to read source code");
     }
 
     size_t nread = fread(buf, sizeof(char), file_size, f);
     if (nread != file_size) {
-        die("only read %zu bytes from file '%s' with size %zu", nread, filepath, file_size);
+        fail("only read %zu bytes from file '%s' with size %zu", nread, filepath, file_size);
     }
     buf[nread] = 0; // This null terminator is really important...
     fclose(f);
@@ -205,7 +262,7 @@ char *read_whole_file(char *filepath) {
     return buf;
 }
 
-void die(const char *fmt, ...) {
+void fail(const char *fmt, ...) {
     fprintf(stderr, "mini: ");
     va_list args;
     va_start(args, fmt);
@@ -214,4 +271,3 @@ void die(const char *fmt, ...) {
     fprintf(stderr, "\n");
     exit(EXIT_FAILURE);
 }
-
