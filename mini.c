@@ -20,6 +20,7 @@ typedef enum {
     TOKEN_EOF,
     /* Keywords */
     TOKEN_LET,
+    TOKEN_CONST,
     TOKEN_GOTO,
     TOKEN_TRUE,
     TOKEN_FALSE,
@@ -52,6 +53,7 @@ const char *token_strings[] = {
     [TOKEN_UNKNOWN] = "< UNKNOWN >",
     [TOKEN_EOF] = "< EOF >",
     [TOKEN_LET] = "let",
+    [TOKEN_CONST] = "const",
     [TOKEN_GOTO] = "goto",
     [TOKEN_TRUE] = "true",
     [TOKEN_FALSE] = "false",
@@ -180,8 +182,8 @@ token next_token(char *input) {
 
     // Skip whitespace
     while (is_whitespace(*p)) {
-        if (*p == '\n') { line_no++; }
-        p++;
+        if (*p == '\n') { line_no++; col_no = 1; }
+        p++; col_no++;
     }
 
     // Check for end of source
@@ -191,6 +193,7 @@ token next_token(char *input) {
     if (*p == '#') {
         while (*p != '\n') { p++; }
         line_no++;
+        col_no = 1;
         start = p;
         return next_token(input);
     }
@@ -220,19 +223,17 @@ token next_token(char *input) {
     }
 
     token symbol;
-    switch (*p++) {
+    switch (*p) {
         case '+': symbol = (token){.type = TOKEN_PLUS}; break;
         case '-': symbol = (token){.type = TOKEN_MINUS}; break;
         case '*': symbol = (token){.type = TOKEN_STAR}; break;
         case '/': symbol = (token){.type = TOKEN_SLASH}; break;
         case '=': symbol = (token){.type = TOKEN_EQUAL}; break;
         case ';': symbol = (token){.type = TOKEN_SEMICOLON}; break;
-        default: {
-                     fprintf(stderr, "unknown symbol at line %zu, col %zu: %c", line_no, col_no, *p); 
-                     exit(EXIT_FAILURE); 
-                 }
+        default: fail("unknown symbol at line %zu, col %zu: %c", line_no, col_no, *p);
     }
 
+    *p++; col_no++;
     start = p;
     return symbol;
 }
