@@ -37,6 +37,7 @@ typedef enum {
     TOKEN_BOOL,
     /* Operators */
     TOKEN_EQUAL,
+    TOKEN_BANG,
     TOKEN_PLUS,
     TOKEN_MINUS,
     TOKEN_STAR,
@@ -112,6 +113,16 @@ typedef enum {
     UNARY_ADDRESS,          // &
 } unary_op;
 
+const char *unary_op_strings[] = {
+    [UNARY_BITWISE_NOT] = "~",
+    [UNARY_LOGICAL_NOT] = "!",
+    [UNARY_NEGATE] = "-",
+    [UNARY_DEREFERENCE] = "*",
+    [UNARY_ADDRESS] = "&",
+};
+
+#define UN_OP(type) unary_op_strings[type]
+
 typedef enum {
     BINARY_ADD,             // +
     BINARY_SUBTRACT,        // -
@@ -125,6 +136,22 @@ typedef enum {
     BINARY_LESS_THAN,       // <
     BINARY_LESS_THAN_EQ,    // <=
 } binary_op;
+
+const char *binary_op_strings[] = {
+    [BINARY_ADD] = "+",
+    [BINARY_SUBTRACT] = "-",
+    [BINARY_MULTIPLY] = "*",
+    [BINARY_DIVIDE] = "/",
+    [BINARY_MODULUS] = "%",
+    [BINARY_EQUALS] = "==",
+    [BINARY_NOT_EQUALS] = "!=",
+    [BINARY_GREATER_THAN] = ">",
+    [BINARY_GREATER_THAN_EQ] = ">=",
+    [BINARY_LESS_THAN] = "<",
+    [BINARY_LESS_THAN_EQ] = "<=",
+};
+
+#define BIN_OP(type) binary_op_strings[type]
 
 typedef enum {
     TYPE_UNKNOWN,
@@ -148,30 +175,35 @@ const char *type_strings[] = {
     [TYPE_CUSTOM] = "[CUSTOM TYPE]",
 };
 
-typedef struct {
+typedef struct type_info type_info;
+typedef struct variable variable;
+typedef struct function_param function_param;
+typedef struct function function;
+typedef struct expression expression;
+
+struct type_info {
     type_kind kind;
     char *name;
-} type_info;
+};
 
-typedef struct {
+struct variable {
     char *name;
     type_info type;
-    bool is_constant;
-    bool is_initialized;
     bool is_pointer;
-} variable;
+    expression *expr;
+};
 
-typedef struct function_param {
+struct function_param {
     char *name;
     type_info type;
     struct function_param *next;
-} function_param;
+};
 
-typedef struct {
+struct function {
     char *name;
     function_param *parameters;
     type_info return_type;
-} function;
+};
 
 typedef enum {
     EXPR_BOOL,
@@ -187,7 +219,7 @@ typedef enum {
     EXPR_EMPTY,
 } expression_type;
 
-typedef struct expression {
+struct expression {
     expression_type type;
     union {
         bool boolean;
@@ -199,17 +231,11 @@ typedef struct expression {
             char *data;
             size_t length;
         } string;
-        struct {
-            unary_op op;
-            struct expression *expression;
-        } unary;
-        struct {
-            binary_op op;
-            struct expression *lhs, *rhs;
-        } binary;
+        unary_op unary;
+        binary_op binary;
         variable *variable;
     } as;
-} expression;
+};
 
 #define AST_CHILDREN_CAPACITY 16
 
@@ -229,11 +255,16 @@ typedef struct ast_node {
     union {
         variable variable;
         function function;
+        expression expression;
     } as;
     struct ast_node **children;
     size_t num_children;
     size_t children_capacity;
 } ast_node;
+
+#define AS_VAR(node) ((*node).as.variable)
+#define AS_FUNC(node) ((*node).as.function)
+#define AS_EXPR(node) ((*node).as.expression)
 
 #define SYMBOL_TABLE_SIZE 4096
 
@@ -241,19 +272,19 @@ typedef struct symbol_info {
     char *name;
     ast_node_type type;
     int scope_level;
-    void *value;
+    ast_node *value;
     bool is_constant;
     bool is_initialized;
     struct symbol_info *next;
 } symbol_info;
 
 typedef struct symbol_table {
-    symbol_info *symbols[4096];
+    symbol_info *symbols[SYMBOL_TABLE_SIZE];
     int scope_level;
 } symbol_table;
 
-void add_symbol(symbol_table *table, char *name, size_t length, ast_node_type type);
-symbol_info *lookup_symbol(symbol_table *table, char *name, size_t length);
+symbol_info *add_symbol(symbol_table *table, char *name, ast_node_type type);
+symbol_info *lookup_symbol(symbol_table *table, char *name);
 void enter_scope(symbol_table *table);
 void exit_scope(symbol_table *table);
 
@@ -276,8 +307,8 @@ ast_node *parse_variable();
 ast_node *parse_function();
 ast_node *parse_function_call();
 ast_node *parse_conditional();
-ast_node *parse_expression();
 ast_node *parse_literal();
+ast_node *parse_expression();
 
 int main(int argc, char **argv) {
     char *input_filename = NULL;
@@ -313,10 +344,10 @@ int main(int argc, char **argv) {
     source_code = read_whole_file(input_filename);
     ast_root = parse_program();
 
-    for (size_t i = 0; i < ast_root->num_children; i++) {
-        ast_node *child = ast_root->children[i];
-        printf("node id (%d)\n", child->type);
-    }
+    //for (size_t i = 0; i < ast_root->num_children; i++) {
+    //    ast_node *child = ast_root->children[i];
+    //    printf("node id (%d)\n", child->type);
+    //}
 
     printf("compiling to artifact '%s' with optimization level %d\n", 
             output_filename, optimization_level);
@@ -409,6 +440,7 @@ token next_token(char *input) {
         case '*': symbol = make_token(TOKEN_STAR); break;
         case '/': symbol = make_token(TOKEN_SLASH); break;
         case '=': symbol = make_token(TOKEN_EQUAL); break;
+        case '!': symbol = make_token(TOKEN_BANG); break;
         case ';': symbol = make_token(TOKEN_SEMICOLON); break;
         case '{': symbol = make_token(TOKEN_LBRACE); break;
         case '}': symbol = make_token(TOKEN_RBRACE); break;
@@ -425,13 +457,6 @@ token next_token(char *input) {
 }
 
 /* Parser */
-int str_to_int(const char *s, size_t length) {
-    int n = 0;
-    for (size_t i = 0; i < length; i++) {
-        n = n * 10 + (s[i] - '0');
-    }
-    return n;
-}
 
 void advance() {
     previous_token = current_token;
@@ -463,28 +488,28 @@ void unexpected(const char *location) {
         TOKSTR(current_token.type), location, current_token.line, current_token.col);
 }
 
-void copy_previous(char *buf) {
-    buf = malloc(sizeof(char) * (previous_token.length + 1));
-    memcpy(buf, previous_token.lexeme, previous_token.length);
-    buf[previous_token.length] = 0;
+void copy_previous(char **buf) {
+    *buf = calloc(previous_token.length + 1, sizeof(char));
+    memcpy(*buf, previous_token.lexeme, previous_token.length);
 }
 
 ast_node *make_ast_node(ast_node_type type) {
     ast_node *node = malloc(sizeof(ast_node));
     node->type = type;
     node->children_capacity = AST_CHILDREN_CAPACITY;
-    node->children = malloc(sizeof(ast_node*) * node->children_capacity);
+    node->children = calloc(node->children_capacity, sizeof(ast_node *));
     node->num_children = 0;
     return node;
 }
 
-void add_ast_child(ast_node *parent, ast_node *child) {
+size_t add_ast_child(ast_node *parent, ast_node *child) {
     if (parent->num_children >= parent->children_capacity) {
-        parent->children_capacity *= 2;
-        void *tmp = realloc(parent->children, sizeof(ast_node*) * parent->children_capacity);
+        parent->children_capacity <<= 1;
+        void *tmp = realloc(parent->children, sizeof(ast_node *) * parent->children_capacity);
         parent->children = tmp;
     }
     parent->children[parent->num_children++] = child;
+    return parent->num_children - 1;
 }
 
 type_kind resolve_type(const char *identifier, size_t length) {
@@ -500,8 +525,120 @@ type_info parse_type() {
     type_info type = {0};
     expect(TOKEN_IDENTIFIER);
     type.kind = resolve_type(previous_token.lexeme, previous_token.length);
-    copy_previous(type.name);
+    copy_previous(&type.name);
     return type;
+}
+
+void print_exprs(ast_node *root) {
+    if (!root) return;
+
+    switch (AS_EXPR(root).type) {
+        case EXPR_BOOL:
+            printf("BOOL(%d)", AS_EXPR(root).as.boolean);
+            break;
+        case EXPR_INT:
+            printf("INT(%d)", AS_EXPR(root).as.integer);
+            break;
+        case EXPR_UNARY:
+            printf("EXPR_UNARY(%s)", UN_OP(AS_EXPR(root).as.unary));
+            break;
+        case EXPR_BINARY:
+            printf("EXPR_BINARY(%s)", BIN_OP(AS_EXPR(root).as.binary));
+            break;
+        default: 
+            printf("[UNKNOWN EXPR TYPE]");
+    }
+
+    printf(" (%ld children)\n", root->num_children);
+
+    for (size_t i = 0; i < root->num_children; i++) {
+        print_exprs(root->children[i]);
+    }
+}
+
+void parse_factor(ast_node *exprs) {
+    ast_node *factor = make_ast_node(NODE_EXPRESSION);
+
+    if (match(TOKEN_IDENTIFIER)) {
+        char *variable_name = NULL;
+        copy_previous(&variable_name);
+        symbol_info *variable_symbol = lookup_symbol(&symbols, variable_name);
+        if (!variable_symbol) {
+            fail("symbol '%s' is not declared", variable_name);
+        }
+        free(variable_name);
+    } else if (match(TOKEN_NUMBER)) {
+        AS_EXPR(factor).type = EXPR_INT;
+        AS_EXPR(factor).as.integer = str_to_int(previous_token.lexeme, previous_token.length);
+    } else if (match(TOKEN_TRUE)) {
+        AS_EXPR(factor).type = EXPR_BOOL;
+        AS_EXPR(factor).as.boolean = true;
+    } else if (match(TOKEN_FALSE)) {
+        AS_EXPR(factor).type = EXPR_BOOL;
+        AS_EXPR(factor).as.boolean = false;
+    } else {
+        unexpected("expression");
+    }
+
+    add_ast_child(exprs, factor);
+}
+
+void parse_term(ast_node *exprs) {
+    parse_factor(exprs);
+    for (;;) {
+        binary_op b_op;
+        if (match(TOKEN_STAR)) { b_op = BINARY_MULTIPLY; }
+        else if (match(TOKEN_SLASH)) { b_op = BINARY_DIVIDE; }
+        else { break; }
+
+        parse_term(exprs);
+
+        ast_node *node = make_ast_node(NODE_EXPRESSION);
+        AS_EXPR(node).type = EXPR_BINARY;
+        AS_EXPR(node).as.binary = b_op;
+        add_ast_child(exprs, node);
+    }
+}
+
+ast_node *parse_expression_internal(ast_node *exprs) {
+    unary_op u_op;
+    bool has_unary_expr = true;
+    if (match(TOKEN_MINUS)) { u_op = UNARY_NEGATE; } 
+    else if (match(TOKEN_BANG)) { u_op = UNARY_LOGICAL_NOT; }
+    else if (match(TOKEN_STAR)) { u_op = UNARY_DEREFERENCE; }
+    else { has_unary_expr = false; }
+
+    if (has_unary_expr) {
+        ast_node *node = make_ast_node(NODE_EXPRESSION);
+        AS_EXPR(node).type = EXPR_UNARY;
+        AS_EXPR(node).as.unary = u_op;
+        add_ast_child(exprs, node);
+    }
+
+    parse_term(exprs);
+
+    for (;;) {
+        binary_op b_op;
+        if (match(TOKEN_PLUS)) { b_op = BINARY_ADD; }
+        else if (match(TOKEN_MINUS)) { b_op = BINARY_SUBTRACT; }
+        else { break; }
+
+        parse_term(exprs);
+
+        ast_node *node = make_ast_node(NODE_EXPRESSION);
+        AS_EXPR(node).type = EXPR_BINARY;
+        AS_EXPR(node).as.binary = b_op;
+        add_ast_child(exprs, node);
+    }
+
+    return NULL;
+}
+
+ast_node *parse_expression() {
+    ast_node *exprs = make_ast_node(NODE_EXPRESSION);
+    exprs->as.expression.type = -1;
+    parse_expression_internal(exprs);
+    return exprs;
 }
 
 ast_node *parse_program() {
@@ -524,30 +661,43 @@ ast_node *parse_program() {
 }
 
 ast_node *parse_statement() {
+    ast_node *node = NULL;
     if (match(TOKEN_LET) || match(TOKEN_CONST)) {
-        return parse_variable();
+        node = parse_variable();
+        expect(TOKEN_SEMICOLON);
     } else if (match(TOKEN_FUNC)) {
-        return parse_function();
+        node = parse_function();
     } else {
         unexpected("statement");
     }
-
-    return NULL;
+    return node;
 }
 
 ast_node *parse_variable() {
-    ast_node *node = make_ast_node(NODE_VARIABLE);
-    node->as.variable.type.kind = TYPE_UNKNOWN;
-    node->as.variable.is_constant = (previous_token.type == TOKEN_CONST) ? true : false;
+    bool is_constant = (previous_token.type == TOKEN_CONST) ? true : false;
 
+    // Parse identifier
     expect(TOKEN_IDENTIFIER);
-    copy_previous(node->as.variable.name);
+    char *name = NULL;
+    copy_previous(&name);
 
+    symbol_info *variable_symbol = add_symbol(&symbols, name, NODE_VARIABLE);
+    variable_symbol->value->as.variable.type.kind = TYPE_UNKNOWN;
+    variable_symbol->is_constant = is_constant;
+    variable_symbol->is_initialized = false;
+
+    // Parse initial expression here and infer type from this expression,
+    // or just parse type (uninitialized)
     if (match(TOKEN_EQUAL)) {
-        // Parse initial expression here
+        // variable_symbol->value->as.variable.expr = parse_expression();
+        ast_node *initial = parse_expression();
+        print_exprs(initial);
+        variable_symbol->is_initialized = true;
+    } else {
+        expect(TOKEN_COLON);
     }
 
-    return node;
+    return variable_symbol->value;
 }
 
 function_param *make_function_param(char *name, type_info type) {
@@ -560,11 +710,15 @@ function_param *make_function_param(char *name, type_info type) {
 ast_node *parse_function() {
     ast_node *node = make_ast_node(NODE_FUNCTION);
 
-    // Identifier
+    // Parse identifier
     expect(TOKEN_IDENTIFIER);
-    copy_previous(node->as.function.name);
+    char *name = NULL;
+    copy_previous(&name);
 
-    // Parameters
+    symbol_info *function_symbol = add_symbol(&symbols, name, NODE_FUNCTION);
+    function_symbol->is_initialized = true;
+
+    // Parse function parameters
     expect(TOKEN_LPAREN);
 
     function_param *params = NULL;
@@ -575,7 +729,7 @@ ast_node *parse_function() {
             continue;
         } else if (match(TOKEN_IDENTIFIER)) {
             char *name = NULL;
-            copy_previous(name);
+            copy_previous(&name);
 
             expect(TOKEN_COLON);
             type_info type = parse_type();
@@ -594,14 +748,14 @@ ast_node *parse_function() {
     }
     node->as.function.parameters = params;
 
-    // Return type
+    // Parse return type
     if (check(TOKEN_IDENTIFIER)) {
         node->as.function.return_type = parse_type();
     } else {
         node->as.function.return_type.kind = TYPE_VOID;
     }
 
-    // Body
+    // Parse function body
     ast_node *body = parse_block();
     add_ast_child(node, body);
 
@@ -609,6 +763,7 @@ ast_node *parse_function() {
 }
 
 ast_node *parse_block() {
+    enter_scope(&symbols);
     ast_node *node = make_ast_node(NODE_BLOCK);
 
     expect(TOKEN_LBRACE);
@@ -622,6 +777,7 @@ ast_node *parse_block() {
         add_ast_child(node, statement);
     }
 
+    exit_scope(&symbols);
     return node;
 }
 
@@ -635,31 +791,33 @@ uint64_t hash(char *s) {
     return hash;
 }
 
-void add_symbol(symbol_table *table, char *name, size_t length, ast_node_type type) {
+symbol_info *add_symbol(symbol_table *table, char *name, ast_node_type type) {
     uint64_t index = hash(name) % SYMBOL_TABLE_SIZE;
     symbol_info *info = malloc(sizeof(symbol_info));
 
     info->name = name;
+    info->value = make_ast_node(type);
     info->type = type;
     info->scope_level = table->scope_level;
 
     symbol_info *exists = table->symbols[index];
     if (exists) {
-        if (memcmp(exists->name, name, length) == 0) {
+        if (memcmp(exists->name, name, strlen(name)) == 0) {
             fail("symbol '%s' already exists in scope", exists->name);
         }
         info->next = exists;
     }
 
     table->symbols[index] = info;
+    return table->symbols[index];
 }
 
-symbol_info *lookup_symbol(symbol_table *table, char *name, size_t length) {
+symbol_info *lookup_symbol(symbol_table *table, char *name) {
     uint64_t index = hash(name) % SYMBOL_TABLE_SIZE;
     symbol_info *info = table->symbols[index];
 
     while (info) {
-        if (memcmp(info->name, name, length) == 0) {
+        if (memcmp(info->name, name, strlen(name)) == 0) {
             return info;
         }
         info = info->next;
@@ -697,6 +855,14 @@ void exit_scope(symbol_table *table) {
 }
 
 /* Misc */
+int str_to_int(const char *s, size_t length) {
+    int n = 0;
+    for (size_t i = 0; i < length; i++) {
+        n = n * 10 + (s[i] - '0');
+    }
+    return n;
+}
+
 char *read_whole_file(char *filepath) {
     FILE *f = fopen(filepath, "rb");
     if (!f) {

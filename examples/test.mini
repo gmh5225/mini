@@ -1,3 +1,5 @@
+# This is a comment
 func main() {
+    # let test = !false;
     let num = -1 + 2 * 3;
 }
