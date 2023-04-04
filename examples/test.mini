@@ -1,1 +1,3 @@
-let num = -1 + 2 * 3;
+func main() {
+    let num = -1 + 2 * 3;
+}

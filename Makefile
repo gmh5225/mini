@@ -12,7 +12,7 @@ debug: CFLAGS := $(filter-out -Werror, $(CFLAGS))
 debug: all
 
 $(TARGET): $(SRC)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 clean:
 	rm -f $(TARGET)
