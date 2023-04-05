@@ -121,7 +121,7 @@ const char *unary_op_strings[] = {
     [UNARY_ADDRESS] = "&",
 };
 
-#define UN_OP(type) unary_op_strings[type]
+#define UNOPSTR(type) unary_op_strings[type]
 
 typedef enum {
     BINARY_ADD,             // +
@@ -151,7 +151,7 @@ const char *binary_op_strings[] = {
     [BINARY_LESS_THAN_EQ] = "<=",
 };
 
-#define BIN_OP(type) binary_op_strings[type]
+#define BINOPSTR(type) binary_op_strings[type]
 
 typedef enum {
     TYPE_UNKNOWN,
@@ -175,11 +175,14 @@ const char *type_strings[] = {
     [TYPE_CUSTOM] = "[CUSTOM TYPE]",
 };
 
+#define TYPESTR(type) type_strings[type]
+
 typedef struct type_info type_info;
 typedef struct variable variable;
 typedef struct function_param function_param;
 typedef struct function function;
 typedef struct expression expression;
+typedef struct ast_node ast_node;
 
 struct type_info {
     type_kind kind;
@@ -190,7 +193,7 @@ struct variable {
     char *name;
     type_info type;
     bool is_pointer;
-    expression *expr;
+    ast_node *assignment;
 };
 
 struct function_param {
@@ -250,6 +253,19 @@ typedef enum {
     NODE_LITERAL,
 } ast_node_type;
 
+const char *node_strings[] = {
+    [NODE_PROGRAM] = "[PROGRAM]",
+    [NODE_BLOCK] = "[BLOCK]",
+    [NODE_VARIABLE] = "[VARIABLE]",
+    [NODE_FUNCTION] = "[FUNCTION]",
+    [NODE_FUNCTION_CALL] = "[FUNCTION_CALL]",
+    [NODE_CONDITIONAL] = "[CONDITIONAL]",
+    [NODE_EXPRESSION] = "[EXPRESSION]",
+    [NODE_LITERAL] = "[LITERAL]",
+};
+
+#define NODESTR(type) node_strings[type]
+
 typedef struct ast_node {
     ast_node_type type;
     union {
@@ -287,6 +303,7 @@ symbol_info *add_symbol(symbol_table *table, char *name, ast_node_type type);
 symbol_info *lookup_symbol(symbol_table *table, char *name);
 void enter_scope(symbol_table *table);
 void exit_scope(symbol_table *table);
+void dump_symbols(symbol_table *table);
 
 char *source_code = NULL;
 token current_token = {0};
@@ -348,6 +365,8 @@ int main(int argc, char **argv) {
     //    ast_node *child = ast_root->children[i];
     //    printf("node id (%d)\n", child->type);
     //}
+
+    dump_symbols(&symbols);
 
     printf("compiling to artifact '%s' with optimization level %d\n", 
             output_filename, optimization_level);
@@ -540,10 +559,10 @@ void print_exprs(ast_node *root) {
             printf("INT(%d)", AS_EXPR(root).as.integer);
             break;
         case EXPR_UNARY:
-            printf("EXPR_UNARY(%s)", UN_OP(AS_EXPR(root).as.unary));
+            printf("EXPR_UNARY(%s)", UNOPSTR(AS_EXPR(root).as.unary));
             break;
         case EXPR_BINARY:
-            printf("EXPR_BINARY(%s)", BIN_OP(AS_EXPR(root).as.binary));
+            printf("EXPR_BINARY(%s)", BINOPSTR(AS_EXPR(root).as.binary));
             break;
         default: 
             printf("[UNKNOWN EXPR TYPE]");
@@ -608,14 +627,14 @@ ast_node *parse_expression_internal(ast_node *exprs) {
     else if (match(TOKEN_STAR)) { u_op = UNARY_DEREFERENCE; }
     else { has_unary_expr = false; }
 
+    parse_term(exprs);
+
     if (has_unary_expr) {
         ast_node *node = make_ast_node(NODE_EXPRESSION);
         AS_EXPR(node).type = EXPR_UNARY;
         AS_EXPR(node).as.unary = u_op;
         add_ast_child(exprs, node);
     }
-
-    parse_term(exprs);
 
     for (;;) {
         binary_op b_op;
@@ -682,16 +701,16 @@ ast_node *parse_variable() {
     copy_previous(&name);
 
     symbol_info *variable_symbol = add_symbol(&symbols, name, NODE_VARIABLE);
-    variable_symbol->value->as.variable.type.kind = TYPE_UNKNOWN;
+    AS_VAR(variable_symbol->value).type.kind = TYPE_UNKNOWN;
     variable_symbol->is_constant = is_constant;
     variable_symbol->is_initialized = false;
 
     // Parse initial expression here and infer type from this expression,
     // or just parse type (uninitialized)
     if (match(TOKEN_EQUAL)) {
-        // variable_symbol->value->as.variable.expr = parse_expression();
-        ast_node *initial = parse_expression();
-        print_exprs(initial);
+        ast_node *assignment = parse_expression();
+        print_exprs(assignment);
+        AS_VAR(variable_symbol->value).assignment = assignment;
         variable_symbol->is_initialized = true;
     } else {
         expect(TOKEN_COLON);
@@ -777,6 +796,7 @@ ast_node *parse_block() {
         add_ast_child(node, statement);
     }
 
+    dump_symbols(&symbols);
     exit_scope(&symbols);
     return node;
 }
@@ -852,6 +872,26 @@ void exit_scope(symbol_table *table) {
     }
 
     table->scope_level--;
+}
+
+void dump_symbols(symbol_table *table) {
+    for (int i = 0; i < SYMBOL_TABLE_SIZE; i++) {
+        symbol_info *info = table->symbols[i];
+        while (info) {
+            printf("[%d] : %s : %s", 
+                    info->scope_level,
+                    NODESTR(info->value->type),
+                    info->name);
+
+            if (info->next) {
+                printf("  ->  ");
+            } else {
+                printf("\n");
+            }
+
+            info = info->next;
+        }
+    }
 }
 
 /* Misc */
