@@ -1,5 +1,30 @@
+const foo: bool = true;
+
 # This is a comment
 func main() {
-    # let test = !false;
-    let num = -1 + 2 * 3;
+    bar := !foo;
+    num := -1 + 2 * 3;
 }
+
+# ================================
+# | output for linux_nasm_x86_64 |
+# ================================
+# section .data
+#     foo db 1
+# 
+# section .text
+#     global _start
+# 
+# _start:
+#     mov rax, foo
+#     not rax 
+#     mov rcx, -1
+#     mov rdx, 2
+#     mov rsi, 3
+#     imul rdx, rsi
+#     add rcx, rdx
+#
+#     ; Exit syscall
+#     mov rax, 1
+#     xor ebx, ebx
+#     syscall

@@ -1,5 +1,4 @@
 /* mini compiler */
-
 #include <stdbool.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -20,7 +19,6 @@ typedef enum {
     TOKEN_UNKNOWN,
     TOKEN_EOF,
     /* Keywords */
-    TOKEN_LET,
     TOKEN_CONST,
     TOKEN_FUNC,
     TOKEN_GOTO,
@@ -36,6 +34,7 @@ typedef enum {
     TOKEN_INT,
     TOKEN_BOOL,
     /* Operators */
+    TOKEN_WALRUS,
     TOKEN_EQUAL,
     TOKEN_BANG,
     TOKEN_PLUS,
@@ -69,7 +68,6 @@ typedef struct {
 const char *token_strings[] = {
     [TOKEN_UNKNOWN] = "[UNKNOWN]",
     [TOKEN_EOF] = "[EOF]",
-    [TOKEN_LET] = "let",
     [TOKEN_CONST] = "const",
     [TOKEN_FUNC] = "func",
     [TOKEN_GOTO] = "goto",
@@ -83,6 +81,7 @@ const char *token_strings[] = {
     [TOKEN_FALSE] = "false",
     [TOKEN_INT] = "int",
     [TOKEN_BOOL] = "bool",
+    [TOKEN_WALRUS] = ":=",
     [TOKEN_EQUAL] = "=",
     [TOKEN_PLUS] = "+",
     [TOKEN_MINUS] = "-",
@@ -102,7 +101,6 @@ const char *token_strings[] = {
     [TOKEN_IDENTIFIER] = "[IDENTIFIER]",
     [TOKEN_NUMBER] = "[NUMBER]",
 };
-
 #define TOKSTR(type) token_strings[type]
 
 typedef enum {
@@ -120,7 +118,6 @@ const char *unary_op_strings[] = {
     [UNARY_DEREFERENCE] = "*",
     [UNARY_ADDRESS] = "&",
 };
-
 #define UNOPSTR(type) unary_op_strings[type]
 
 typedef enum {
@@ -150,7 +147,6 @@ const char *binary_op_strings[] = {
     [BINARY_LESS_THAN] = "<",
     [BINARY_LESS_THAN_EQ] = "<=",
 };
-
 #define BINOPSTR(type) binary_op_strings[type]
 
 typedef enum {
@@ -174,7 +170,6 @@ const char *type_strings[] = {
     [TYPE_CHAR] = "char",
     [TYPE_CUSTOM] = "[CUSTOM TYPE]",
 };
-
 #define TYPESTR(type) type_strings[type]
 
 typedef struct type_info type_info;
@@ -263,7 +258,6 @@ const char *node_strings[] = {
     [NODE_EXPRESSION] = "[EXPRESSION]",
     [NODE_LITERAL] = "[LITERAL]",
 };
-
 #define NODESTR(type) node_strings[type]
 
 typedef struct ast_node {
@@ -305,12 +299,20 @@ void enter_scope(symbol_table *table);
 void exit_scope(symbol_table *table);
 void dump_symbols(symbol_table *table);
 
+typedef enum {
+    TARGET_LINUX_NASM_X86_64,
+} target_asm;
+
+const char *target_strings[] = {
+    [TARGET_LINUX_NASM_X86_64] = "linux_nasm_x86_64",
+};
+#define TARGETSTR(type) target_strings[type]
+
 char *source_code = NULL;
-token current_token = {0};
-token previous_token = {0};
 ast_node *ast_root = NULL;
 symbol_table symbols = {0};
 int line_no = 1, col_no = 1;
+char *outbuf = NULL;
 
 token next_token();
 void advance();
@@ -378,6 +380,9 @@ int main(int argc, char **argv) {
 }
 
 /* Lexer */
+char *p = NULL;
+char *start = NULL;
+
 bool is_whitespace(char c) { return c == ' ' || c == '\n' || c == '\t' || c == '\r'; }
 bool is_alphabetic(char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'; }
 bool is_numeric(char c) { return c >= '0' && c <= '9'; }
@@ -393,10 +398,16 @@ token make_token(token_type type) {
     };
 }
 
-token next_token(char *input) {
-    static char *p = NULL;
-    static char *start = NULL;
+bool next_char_matches(char c) {
+    if (*(p + 1) == '\0') {
+        fail("expected another character, got EOF");
+    }
+    bool matches = *(p + 1) == c;
+    if (matches) p++;
+    return matches;
+}
 
+token next_token(char *input) {
     if (!p) {
         p = input;
         start = input;
@@ -417,7 +428,7 @@ token next_token(char *input) {
 
     // Skip comments
     if (*p == '#') {
-        while (*p != '\n') { p++; }
+        while (*p != '\n') { p++; } p++;
         line_no++;
         col_no = 1;
         start = p;
@@ -429,7 +440,7 @@ token next_token(char *input) {
         while (is_alphanumeric(*p)) { p++; col_no++; }
         size_t length = (size_t)(p - start);
 
-        for (token_type type = TOKEN_LET; type <= TOKEN_FALSE; type++) {
+        for (token_type type = TOKEN_CONST; type <= TOKEN_FALSE; type++) {
             if (memcmp(start, TOKSTR(type), length) == 0) {
                 token keyword = make_token(type);
                 start = p;
@@ -452,7 +463,7 @@ token next_token(char *input) {
         return number;
     }
 
-    token symbol;
+    token symbol = {0};
     switch (*p) {
         case '+': symbol = make_token(TOKEN_PLUS); break;
         case '-': symbol = make_token(TOKEN_MINUS); break;
@@ -461,6 +472,9 @@ token next_token(char *input) {
         case '=': symbol = make_token(TOKEN_EQUAL); break;
         case '!': symbol = make_token(TOKEN_BANG); break;
         case ';': symbol = make_token(TOKEN_SEMICOLON); break;
+        case ':': symbol = make_token(next_char_matches('=') ? TOKEN_WALRUS : TOKEN_COLON); break;
+        case ',': symbol = make_token(TOKEN_COMMA); break;
+        case '.': symbol = make_token(TOKEN_DOT); break;
         case '{': symbol = make_token(TOKEN_LBRACE); break;
         case '}': symbol = make_token(TOKEN_RBRACE); break;
         case '(': symbol = make_token(TOKEN_LPAREN); break;
@@ -476,6 +490,8 @@ token next_token(char *input) {
 }
 
 /* Parser */
+token current_token = {0};
+token previous_token = {0};
 
 void advance() {
     previous_token = current_token;
@@ -681,7 +697,7 @@ ast_node *parse_program() {
 
 ast_node *parse_statement() {
     ast_node *node = NULL;
-    if (match(TOKEN_LET) || match(TOKEN_CONST)) {
+    if (match(TOKEN_IDENTIFIER) || match(TOKEN_CONST)) {
         node = parse_variable();
         expect(TOKEN_SEMICOLON);
     } else if (match(TOKEN_FUNC)) {
@@ -693,10 +709,13 @@ ast_node *parse_statement() {
 }
 
 ast_node *parse_variable() {
-    bool is_constant = (previous_token.type == TOKEN_CONST) ? true : false;
+    bool is_constant = false;
+    if (previous_token.type == TOKEN_CONST) {
+        is_constant = true;
+        expect(TOKEN_IDENTIFIER);
+    }
 
     // Parse identifier
-    expect(TOKEN_IDENTIFIER);
     char *name = NULL;
     copy_previous(&name);
 
@@ -707,13 +726,21 @@ ast_node *parse_variable() {
 
     // Parse initial expression here and infer type from this expression,
     // or just parse type (uninitialized)
-    if (match(TOKEN_EQUAL)) {
+    if (match(TOKEN_WALRUS)) {
         ast_node *assignment = parse_expression();
         print_exprs(assignment);
         AS_VAR(variable_symbol->value).assignment = assignment;
         variable_symbol->is_initialized = true;
     } else {
         expect(TOKEN_COLON);
+        AS_VAR(variable_symbol->value).type = parse_type();
+
+        if (match(TOKEN_EQUAL)) {
+            ast_node *assignment = parse_expression();
+            print_exprs(assignment);
+            AS_VAR(variable_symbol->value).assignment = assignment;
+            variable_symbol->is_initialized = true;
+        }
     }
 
     return variable_symbol->value;
@@ -727,6 +754,7 @@ function_param *make_function_param(char *name, type_info type) {
 }
 
 ast_node *parse_function() {
+    enter_scope(&symbols);
     ast_node *node = make_ast_node(NODE_FUNCTION);
 
     // Parse identifier
@@ -778,11 +806,12 @@ ast_node *parse_function() {
     ast_node *body = parse_block();
     add_ast_child(node, body);
 
+    dump_symbols(&symbols);
+    exit_scope(&symbols);
     return node;
 }
 
 ast_node *parse_block() {
-    enter_scope(&symbols);
     ast_node *node = make_ast_node(NODE_BLOCK);
 
     expect(TOKEN_LBRACE);
@@ -796,8 +825,6 @@ ast_node *parse_block() {
         add_ast_child(node, statement);
     }
 
-    dump_symbols(&symbols);
-    exit_scope(&symbols);
     return node;
 }
 
