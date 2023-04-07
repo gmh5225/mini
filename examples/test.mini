@@ -1,27 +1,29 @@
 const something: bool = false;
 
-# This is a comment
+// This is a comment
 func main() int {
     num := -1 + 2 * 3;
-    # Return value in variable `num` as status code
-    # return num;
+    // Return value in variable `num` as status code
+    // return num;
 }
 
-# ================================
-# | output for linux_nasm_x86_64 |
-# ================================
-# section .text
-#     global _start
-# 
-# _start:
-#     ; Evaluate -1 + 2 * 3
-#     mov rax, 2
-#     mov rbx, 3
-#     imul rax, rbx
-#     mov rcx, -1
-#     add rax, rcx
-#
-#     ; Exit syscall
-#     mov rdi, rax
-#     mov rax, 60
-#     syscall
+/*
+ ================================
+ | output for linux_nasm_x86_64 |
+ ================================
+ section .text
+     global _start
+ 
+ _start:
+     ; Evaluate -1 + 2 * 3
+     mov rax, 2
+     mov rbx, 3
+     imul rax, rbx
+     mov rcx, -1
+     add rax, rcx
+
+     ; Exit syscall
+     mov rdi, rax
+     mov rax, 60
+     syscall
+*/

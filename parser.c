@@ -321,6 +321,8 @@ ast_node *parse_function() {
     symbol->is_initialized = true;
 
     enter_scope(func_scope);
+
+    // Add the function symbol in its own scope to allow for recursion
     symbol_table_insert(current_table, func_name, NODE_FUNCTION);
 
     // Parse function parameters
@@ -377,13 +379,6 @@ ast_node *parse_program(char *source) {
 
     advance();
     while (!match(TOKEN_EOF)) {
-#ifdef DEBUG
-        printf("%s", token_as_str(current_token.type));
-        if (current_token.length > 0) {
-            printf(":%.*s", (int)current_token.length, current_token.lexeme);
-        }
-        printf("\n");
-#endif
         ast_node *statement = parse_declaration();
         add_ast_child(program, statement);
     }

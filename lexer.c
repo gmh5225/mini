@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include <stdio.h>
+
 const char *token_strings[] = {
     [TOKEN_UNKNOWN] = "[UNKNOWN]",
     [TOKEN_EOF] = "[EOF]",
@@ -88,7 +90,6 @@ void lex_alphabetic(token *t) {
 
     t->type = TOKEN_IDENTIFIER;
     t->lexeme = start; t->length = length;
-    start = p;
 }
 
 void lex_numeric(token *t) {
@@ -97,7 +98,6 @@ void lex_numeric(token *t) {
 
     t->type = TOKEN_NUMBER;
     t->lexeme = start; t->length = length;
-    start = p;
 }
 
 void lex_symbol(token *t) {
@@ -121,7 +121,6 @@ void lex_symbol(token *t) {
         default: fail("unknown symbol at line %zu, col %zu: %c", line_no, col_no, *p);
     }
     p++; col_no++;
-    start = p;
 }
 
 token next_token(char *input) {
@@ -144,12 +143,32 @@ token next_token(char *input) {
     if (*p == '\0') { return make_token(TOKEN_EOF); }
 
     // Skip comments
-    if (*p == '#') {
-        while (*p != '\n') { p++; } p++;
-        line_no++;
-        col_no = 1;
-        start = p;
-        return next_token(input);
+    if (*p == '/') {
+        p++;
+        if (*p == '/') {
+            while (*p != '\n') { p++; } p++;
+            line_no++; col_no = 1;
+            start = p;
+            return next_token(input);
+        } else if (*p == '*') {
+            p++;
+            for (;;) {
+                if (*p == '*' && next_char_matches('/')) {
+                    p++;
+                    break;
+                }
+                p++;
+                if (*p == '\n') {
+                    line_no++; col_no = 1;
+                } else {
+                    col_no++;
+                }
+            }
+            start = p;
+            return next_token(input);
+        } else {
+            fail("invalid token at line %zu, col %zu: %c", line_no, col_no, *p);
+        }
     }
 
     start = p;
@@ -161,5 +180,6 @@ token next_token(char *input) {
     } else {
         lex_symbol(&result);
     }
+    start = p;
     return result;
 }
