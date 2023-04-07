@@ -92,9 +92,7 @@ symbol_info *symbol_table_lookup(symbol_table *table, char *symbol_name) {
     // table first, and then finally the __GLOBAL__ scope
     if (!info && table != global_scope) {
         if (table->parent) {
-            symbol_table_lookup(table->parent, symbol_name);
-        } else {
-            symbol_table_lookup(global_scope, symbol_name);
+            return symbol_table_lookup(table->parent, symbol_name);
         }
     }
 
