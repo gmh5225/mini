@@ -10,6 +10,7 @@ typedef enum {
     /* Keywords */
     TOKEN_CONST,
     TOKEN_FUNC,
+    TOKEN_RETURN,
     TOKEN_USE,
     TOKEN_STRUCT,
     TOKEN_ENUM,

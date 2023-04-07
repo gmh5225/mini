@@ -11,6 +11,7 @@ const char *token_strings[] = {
     [TOKEN_EOF] = "[EOF]",
     [TOKEN_CONST] = "const",
     [TOKEN_FUNC] = "func",
+    [TOKEN_RETURN] = "return",
     [TOKEN_USE] = "use",
     [TOKEN_STRUCT] = "struct",
     [TOKEN_ENUM] = "enum",
@@ -46,6 +47,7 @@ const char *token_as_str(token_type type) {
     return token_strings[type];
 }
 
+/* Lexer State */
 static char *p = NULL;
 static char *start = NULL;
 int line_no = 1;

@@ -47,39 +47,55 @@ symbol_table *symbol_table_create(char *name) {
 }
 
 symbol_info *symbol_table_insert(symbol_table *table, char *symbol_name, ast_node_type type) {
-    uint64_t index = hash(symbol_name) % SYMBOL_TABLE_SIZE;
+    if (!table) return NULL;
 
-    symbol_info *info = symbol_info_create();
-
-    info->name = symbol_name;
-    info->type = type;
-
-    symbol_info *exists = table->symbols[index];
-    if (exists && exists->name) {
-        if (memcmp(exists->name, symbol_name, strlen(symbol_name)) == 0) {
-            return NULL;
-        }
-        info->next = exists;
+    // Check if the symbol already exists in one of the current table or parent tables.
+    symbol_info *exists = NULL;
+    if ((exists = symbol_table_lookup(table, symbol_name))) {
+        return NULL;
     }
 
-    table->symbols[index] = info;
-    return table->symbols[index];
-}
-
-symbol_info *symbol_table_lookup(symbol_table *table, char *symbol_name) {
     uint64_t index = hash(symbol_name) % SYMBOL_TABLE_SIZE;
     symbol_info *info = table->symbols[index];
 
-    while (info) {
+    // If a symbol_info already exists at index AND is contains valid symbol information,
+    // deal with the hash collision by appending to the linked list
+    if (info && info->name) {
+        symbol_info *new_info = symbol_info_create();
+        new_info->name = symbol_name;
+        new_info->type = type;
+        new_info->next = info;
+        return new_info;
+    }
+
+    // Otherwise, edit the data at index in place and return it.
+    info->name = symbol_name;
+    info->type = type;
+    info->next = NULL;
+    return info;
+}
+
+symbol_info *symbol_table_lookup(symbol_table *table, char *symbol_name) {
+    if (!table) return NULL;
+
+    uint64_t index = hash(symbol_name) % SYMBOL_TABLE_SIZE;
+    symbol_info *info = table->symbols[index];
+
+    while (info && info->name) {
         if (memcmp(info->name, symbol_name, strlen(symbol_name)) == 0) {
             return info;
         }
         info = info->next;
     }
 
-    // If we couldn't find the symbol in the current scope, search in the __GLOBAL__ scope
+    // If we couldn't find the symbol in the current scope, search in the parent of the current
+    // table first, and then finally the __GLOBAL__ scope
     if (!info && table != global_scope) {
-        symbol_table_lookup(global_scope, symbol_name);
+        if (table->parent) {
+            symbol_table_lookup(table->parent, symbol_name);
+        } else {
+            symbol_table_lookup(global_scope, symbol_name);
+        }
     }
 
     return NULL;

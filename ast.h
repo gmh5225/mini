@@ -69,6 +69,7 @@ struct function {
 };
 
 typedef enum {
+    EXPR_UNKNOWN,
     EXPR_BOOL,
     EXPR_INT,
     EXPR_UINT,
@@ -82,6 +83,16 @@ typedef enum {
     EXPR_EMPTY,
 } expression_type;
 
+typedef struct {
+    unary_op op;
+    expression *expr;
+} unary_expr;
+
+typedef struct {
+    binary_op op;
+    expression *lhs, *rhs;
+} binary_expr;
+
 struct expression {
     expression_type type;
     union {
@@ -94,9 +105,8 @@ struct expression {
             char *data;
             size_t length;
         } string;
-        unary_op unary;
-        binary_op binary;
-        variable *variable;
+        unary_expr unary;
+        binary_expr binary;
     } as;
 };
 
@@ -110,6 +120,7 @@ typedef enum {
     NODE_FUNCTION_CALL,
     NODE_CONDITIONAL,
     NODE_EXPRESSION,
+    NODE_RETURN_STATEMENT,
     NODE_LITERAL,
 } ast_node_type;
 

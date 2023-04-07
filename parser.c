@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Parser State */
 symbol_table *global_scope = NULL;
 static char *source_code = NULL;
 static token current_token = {0};
@@ -79,6 +80,7 @@ size_t add_ast_child(ast_node *parent, ast_node *child) {
     return parent->num_children - 1;
 }
 
+
 void enter_scope(symbol_table *next_table) {
     previous_table = current_table;
     current_table = next_table;
@@ -86,6 +88,7 @@ void enter_scope(symbol_table *next_table) {
 
 void exit_scope() {
     current_table = previous_table;
+    previous_table = current_table->parent;
 }
 
 symbol_table *create_scope(char *scope_name) {
@@ -111,38 +114,49 @@ type_info parse_type() {
     return type;
 }
 
-void print_exprs_impl(ast_node *root, int level) {
-    for (int i = 0; i < level; i++) {
-        printf("    ");
-    }
-
-    switch (AS_EXPR(root).type) {
+void print_expr_impl(expression *expr) {
+    switch (expr->type) {
         case EXPR_BOOL:
-            printf("BOOL(%s)", AS_EXPR(root).as.boolean ? "true" : "false");
+            printf("BOOL(%s)", expr->as.boolean ? "true" : "false");
             break;
         case EXPR_INT:
-            printf("INT(%d)", AS_EXPR(root).as.integer);
+            printf("INT(%d)", expr->as.integer);
             break;
         case EXPR_UNARY:
-            printf("EXPR_UNARY(%s)", unary_as_str(AS_EXPR(root).as.unary));
+            printf("UNARY(%s", unary_as_str(expr->as.unary.op));
+            print_expr_impl(expr->as.unary.expr);
+            printf(")");
             break;
         case EXPR_BINARY:
-            printf("EXPR_BINARY(%s)", binary_as_str(AS_EXPR(root).as.binary));
+            printf("BINARY(");
+            print_expr_impl(expr->as.binary.lhs);
+            printf(" %s ", binary_as_str(expr->as.binary.op));
+            print_expr_impl(expr->as.binary.rhs);
+            printf(")");
+            break;
+        case EXPR_VAR:
+            printf("VAR(%s)", expr->as.string.data);
             break;
         default: 
             printf("[UNKNOWN EXPR TYPE]");
     }
-
-    printf(" (%ld children)\n", root->num_children);
-
-    for (size_t i = 0; i < root->num_children; i++) {
-        print_exprs_impl(root->children[i], level + 1);
-    }
 }
 
-void print_exprs(ast_node *root) {
-    if (!root) return;
-    print_exprs_impl(root, 0);
+void print_expr(expression *expr) {
+    if (!expr) return;
+    print_expr_impl(expr);
+    printf("\n");
+}
+
+void push_expr_stack(ast_node *exprs, ast_node *expr) {
+    add_ast_child(exprs, expr);
+}
+
+ast_node *pop_expr_stack(ast_node *exprs) {
+    ast_node *result = exprs->children[exprs->num_children - 1];
+    exprs->children[exprs->num_children - 1] = NULL;
+    exprs->num_children--;
+    return result;
 }
 
 void parse_factor(ast_node *exprs) {
@@ -153,9 +167,12 @@ void parse_factor(ast_node *exprs) {
         copy_previous(&var_name);
         symbol_info *symbol = symbol_table_lookup(current_table, var_name);
         if (!symbol) {
-            fail("symbol '%s' is not declared", var_name);
+            fail("unknown symbol '%s' at line %zu, col %zu", var_name, 
+                    current_token.line, current_token.col);
         }
-        free(var_name);
+        AS_EXPR(factor).type = EXPR_VAR;
+        AS_EXPR(factor).as.string.data = var_name;
+        AS_EXPR(factor).as.string.length = strlen(var_name);
     } else if (match(TOKEN_NUMBER)) {
         AS_EXPR(factor).type = EXPR_INT;
         AS_EXPR(factor).as.integer = str_to_int(previous_token.lexeme, previous_token.length);
@@ -169,7 +186,7 @@ void parse_factor(ast_node *exprs) {
         unexpected("expression");
     }
 
-    add_ast_child(exprs, factor);
+    push_expr_stack(exprs, factor);
 }
 
 void parse_term(ast_node *exprs) {
@@ -180,12 +197,15 @@ void parse_term(ast_node *exprs) {
         else if (match(TOKEN_SLASH)) { b_op = BINARY_DIVIDE; }
         else { break; }
 
-        parse_term(exprs);
-
         ast_node *node = make_ast_node(NODE_EXPRESSION);
         AS_EXPR(node).type = EXPR_BINARY;
-        AS_EXPR(node).as.binary = b_op;
-        add_ast_child(exprs, node);
+        AS_EXPR(node).as.binary.op = b_op;
+
+        AS_EXPR(node).as.binary.lhs = &AS_EXPR(pop_expr_stack(exprs));
+        parse_term(exprs);
+        AS_EXPR(node).as.binary.rhs = &AS_EXPR(pop_expr_stack(exprs));
+
+        push_expr_stack(exprs, node);
     }
 }
 
@@ -202,8 +222,9 @@ ast_node *parse_expression_impl(ast_node *exprs) {
     if (has_unary_expr) {
         ast_node *node = make_ast_node(NODE_EXPRESSION);
         AS_EXPR(node).type = EXPR_UNARY;
-        AS_EXPR(node).as.unary = u_op;
-        add_ast_child(exprs, node);
+        AS_EXPR(node).as.unary.op = u_op;
+        AS_EXPR(node).as.unary.expr = &AS_EXPR(pop_expr_stack(exprs));
+        push_expr_stack(exprs, node);
     }
 
     for (;;) {
@@ -212,12 +233,15 @@ ast_node *parse_expression_impl(ast_node *exprs) {
         else if (match(TOKEN_MINUS)) { b_op = BINARY_SUBTRACT; }
         else { break; }
 
-        parse_term(exprs);
-
         ast_node *node = make_ast_node(NODE_EXPRESSION);
         AS_EXPR(node).type = EXPR_BINARY;
-        AS_EXPR(node).as.binary = b_op;
-        add_ast_child(exprs, node);
+        AS_EXPR(node).as.binary.op = b_op;
+
+        AS_EXPR(node).as.binary.lhs = &AS_EXPR(pop_expr_stack(exprs));
+        parse_term(exprs);
+        AS_EXPR(node).as.binary.rhs = &AS_EXPR(pop_expr_stack(exprs));
+
+        push_expr_stack(exprs, node);
     }
 
     return NULL;
@@ -225,11 +249,10 @@ ast_node *parse_expression_impl(ast_node *exprs) {
 
 ast_node *parse_expression() {
     ast_node *exprs = make_ast_node(NODE_EXPRESSION);
-    exprs->as.expression.type = -1;
     parse_expression_impl(exprs);
-    return exprs;
+    ast_node *expr = pop_expr_stack(exprs);
+    return expr;
 }
-
 
 ast_node *parse_declaration() {
     ast_node *decl = NULL;
@@ -247,11 +270,18 @@ ast_node *parse_declaration() {
 ast_node *parse_statement() {
     ast_node *stmt = NULL;
     if (match(TOKEN_IDENTIFIER) || match(TOKEN_CONST)) {
-        stmt = parse_variable();
-        expect(TOKEN_SEMICOLON);
+        if (previous_token.type == TOKEN_IDENTIFIER && check(TOKEN_LPAREN)) {
+            stmt = parse_function_call();
+        } else {
+            stmt = parse_variable();
+        }
+    } else if (match(TOKEN_RETURN)) {
+        stmt = parse_expression();
+        stmt->type = NODE_RETURN_STATEMENT;
     } else {
         unexpected("block statement");
     }
+    expect(TOKEN_SEMICOLON);
     return stmt;
 }
 
@@ -280,23 +310,23 @@ ast_node *parse_variable() {
     // Parse initial expression here and infer type from this expression,
     // or just parse type (uninitialized)
     if (match(TOKEN_WALRUS)) {
-        ast_node *assignment = parse_expression();
-        print_exprs(assignment);
-        AS_VAR(var).assignment = assignment;
+        AS_VAR(var).assignment = parse_expression();
         symbol->is_initialized = true;
     } else {
         expect(TOKEN_COLON);
         AS_VAR(var).type = parse_type();
 
         if (match(TOKEN_EQUAL)) {
-            ast_node *assignment = parse_expression();
-            print_exprs(assignment);
-            AS_VAR(var).assignment = assignment;
+            AS_VAR(var).assignment = parse_expression();
             symbol->is_initialized = true;
         }
     }
 
     return var;
+}
+
+ast_node *parse_function_call() {
+    return NULL;
 }
 
 function_param *make_function_param(char *name, type_info type) {
@@ -335,6 +365,8 @@ ast_node *parse_function() {
         else if (match(TOKEN_IDENTIFIER)) {
             char *param_name = NULL;
             copy_previous(&param_name);
+
+            symbol_table_insert(current_table, param_name, NODE_VARIABLE);
 
             expect(TOKEN_COLON);
             type_info type = parse_type();
