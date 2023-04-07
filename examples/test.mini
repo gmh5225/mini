@@ -1,30 +1,27 @@
-const foo: bool = true;
+const something: bool = false;
 
 # This is a comment
-func main() {
-    bar := !foo;
+func main() int {
     num := -1 + 2 * 3;
+    # Return value in variable `num` as status code
+    # return num;
 }
 
 # ================================
 # | output for linux_nasm_x86_64 |
 # ================================
-# section .data
-#     foo db 1
-# 
 # section .text
 #     global _start
 # 
 # _start:
-#     mov rax, foo
-#     not rax 
+#     ; Evaluate -1 + 2 * 3
+#     mov rax, 2
+#     mov rbx, 3
+#     imul rax, rbx
 #     mov rcx, -1
-#     mov rdx, 2
-#     mov rsi, 3
-#     imul rdx, rsi
-#     add rcx, rdx
+#     add rax, rcx
 #
 #     ; Exit syscall
-#     mov rax, 1
-#     xor ebx, ebx
+#     mov rdi, rax
+#     mov rax, 60
 #     syscall

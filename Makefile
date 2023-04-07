@@ -1,6 +1,8 @@
 TARGET     = mini
 
-SRC        = mini.c
+SRC        = $(wildcard *.c)
+OBJ        = $(SRC:.c=.o)
+DEP        = $(OBJ:.o=.d)
 CC         = gcc
 CFLAGS     = -Wall -Werror -MMD -std=c11
 
@@ -14,5 +16,15 @@ debug: all
 $(TARGET): $(SRC)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+-include $(DEP)
+
+.PHONY: clean
 clean:
-	rm -f $(TARGET)
+	rm -f $(OBJ) $(TARGET)
+
+.PHONY: cleandep
+cleandep:
+	rm -f $(DEP)
+
+.PHONY: cleanall
+cleanall: clean cleandep

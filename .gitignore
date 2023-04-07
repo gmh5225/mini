@@ -1,4 +1,5 @@
 mini
+*.asm
 
 # Prerequisites
 *.d
