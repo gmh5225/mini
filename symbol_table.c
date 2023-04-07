@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+symbol_table *global_scope = NULL;
+
 uint64_t hash(char *s) {
     uint64_t hash = 5381;
     int c;
@@ -50,8 +52,10 @@ symbol_info *symbol_table_insert(symbol_table *table, char *symbol_name, ast_nod
     if (!table) return NULL;
 
     // Check if the symbol already exists in one of the current table or parent tables.
+    // If the symbol is a function, ignore this check as we will still add it to its own
+    // scope to allow for recursion.
     symbol_info *exists = NULL;
-    if ((exists = symbol_table_lookup(table, symbol_name))) {
+    if ((exists = symbol_table_lookup(table, symbol_name)) && type != NODE_FUNCTION) {
         return NULL;
     }
 
@@ -90,10 +94,8 @@ symbol_info *symbol_table_lookup(symbol_table *table, char *symbol_name) {
 
     // If we couldn't find the symbol in the current scope, search in the parent of the current
     // table first, and then finally the __GLOBAL__ scope
-    if (!info && table != global_scope) {
-        if (table->parent) {
-            return symbol_table_lookup(table->parent, symbol_name);
-        }
+    if (table != global_scope && table->parent) {
+        return symbol_table_lookup(table->parent, symbol_name);
     }
 
     return NULL;

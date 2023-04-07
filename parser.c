@@ -9,7 +9,6 @@
 #include <string.h>
 
 /* Parser State */
-symbol_table *global_scope = NULL;
 static char *source_code = NULL;
 static token current_token = {0};
 static token previous_token = {0};
