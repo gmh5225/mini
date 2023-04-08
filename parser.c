@@ -18,7 +18,8 @@ static symbol_table *current_table = NULL;
 ast_node *parse_program();
 ast_node *parse_declaration();
 ast_node *parse_statement();
-ast_node *parse_variable();
+ast_node *parse_variable_declaration();
+ast_node *parse_variable_assignment();
 ast_node *parse_function();
 ast_node *parse_function_call();
 ast_node *parse_conditional();
@@ -222,7 +223,7 @@ ast_node *parse_expression() {
 ast_node *parse_declaration() {
     ast_node *decl = NULL;
     if (match(TOKEN_IDENTIFIER) || match(TOKEN_CONST)) {
-        decl = parse_variable();
+        decl = parse_variable_declaration();
         expect(TOKEN_SEMICOLON);
     } else if (match(TOKEN_FUNC)) {
         decl = parse_function();
@@ -237,8 +238,12 @@ ast_node *parse_statement() {
     if (match(TOKEN_IDENTIFIER) || match(TOKEN_CONST)) {
         if (previous_token.type == TOKEN_IDENTIFIER && check(TOKEN_LPAREN)) {
             stmt = parse_function_call();
+        } else if (check(TOKEN_WALRUS) || check(TOKEN_COLON)) {
+            stmt = parse_variable_declaration();
+        } else if (previous_token.type != TOKEN_CONST && check(TOKEN_EQUAL)) {
+            stmt = parse_variable_assignment();
         } else {
-            stmt = parse_variable();
+            unexpected("identifier statement");
         }
     } else if (match(TOKEN_RETURN)) {
         stmt = parse_expression();
@@ -250,7 +255,7 @@ ast_node *parse_statement() {
     return stmt;
 }
 
-ast_node *parse_variable() {
+ast_node *parse_variable_declaration() {
     bool is_constant = false;
     if (previous_token.type == TOKEN_CONST) {
         is_constant = true;
@@ -261,16 +266,17 @@ ast_node *parse_variable() {
     char *var_name = NULL;
     copy_previous(&var_name);
 
-    ast_node *var = make_ast_node(NODE_VARIABLE);
-    AS_VAR(var).name = var_name;
-    AS_VAR(var).type.kind = TYPE_UNKNOWN;
-
-    symbol_info *symbol = symbol_table_insert(current_table, var_name, NODE_VARIABLE);
+    symbol_info *symbol = symbol_table_insert(current_table, var_name, SYMBOL_VARIABLE);
     if (!symbol) {
-        fail("symbol '%s' already exists in scope", var_name);
+        fail("at line %zu, col %zu: symbol '%s' already exists in scope", 
+                previous_token.line, previous_token.col, var_name);
     }
     symbol->is_constant = is_constant;
     symbol->is_initialized = false;
+
+    ast_node *var = make_ast_node(NODE_VARIABLE_DECLARATION);
+    AS_VAR(var).name = var_name;
+    AS_VAR(var).type.kind = TYPE_UNKNOWN;
 
     // Parse initial expression here and infer type from this expression,
     // or just parse type (uninitialized)
@@ -290,6 +296,20 @@ ast_node *parse_variable() {
     return var;
 }
 
+ast_node *parse_variable_assignment() {
+    // Parse identifier
+    char *var_name = NULL;
+    copy_previous(&var_name);
+
+    symbol_info *symbol = symbol_table_lookup(current_table, var_name);
+    if (!symbol) {
+        fail("at line %zu, col %zu: unknown symbol '%s'",
+                previous_token.line, previous_token.col, var_name);
+    }
+
+    return NULL;
+}
+
 ast_node *parse_function_call() {
     return NULL;
 }
@@ -307,18 +327,18 @@ ast_node *parse_function() {
     char *func_name = NULL;
     copy_previous(&func_name);
 
-    ast_node *func = make_ast_node(NODE_FUNCTION);
+    ast_node *func = make_ast_node(NODE_FUNCTION_DECLARATION);
     AS_FUNC(func).name = func_name;
     AS_FUNC(func).return_type.kind = TYPE_VOID;
 
     symbol_table *func_scope = create_scope(func_name);
-    symbol_info *symbol = symbol_table_insert(current_table, func_name, NODE_FUNCTION);
+    symbol_info *symbol = symbol_table_insert(current_table, func_name, SYMBOL_FUNCTION);
     symbol->is_initialized = true;
 
     enter_scope(func_scope);
 
     // Add the function symbol in its own scope to allow for recursion
-    symbol_table_insert(current_table, func_name, NODE_FUNCTION);
+    symbol_table_insert(current_table, func_name, SYMBOL_FUNCTION);
 
     // Parse function parameters
     expect(TOKEN_LPAREN);
@@ -331,7 +351,7 @@ ast_node *parse_function() {
             char *param_name = NULL;
             copy_previous(&param_name);
 
-            symbol_table_insert(current_table, param_name, NODE_VARIABLE);
+            symbol_table_insert(current_table, param_name, SYMBOL_VARIABLE);
 
             expect(TOKEN_COLON);
             type_info type = parse_type();

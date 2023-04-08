@@ -49,6 +49,17 @@ struct type_info {
     char *name;
 };
 
+typedef enum {
+    TYPEDEF_STRUCT,
+    TYPEDEF_ENUM,
+} type_definition_kind;
+
+struct type_definition {
+    type_definition_kind kind;
+    int size;
+    char *name;
+};
+
 struct variable {
     char *name;
     type_info type;
@@ -114,9 +125,11 @@ struct expression {
 
 typedef enum {
     NODE_PROGRAM,
+    NODE_TYPEDEF,
     NODE_BLOCK,
-    NODE_VARIABLE,
-    NODE_FUNCTION,
+    NODE_VARIABLE_DECLARATION,
+    NODE_VARIABLE_ASSIGNMENT,
+    NODE_FUNCTION_DECLARATION,
     NODE_FUNCTION_CALL,
     NODE_CONDITIONAL,
     NODE_EXPRESSION,

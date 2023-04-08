@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     printf("AST for file '%s':\n", input_filename);
     ast_dump(ast);
     printf("\n");
-    
+
     printf("Symbol Table(s):\n");
     symbol_table_dump(global_scope);
     printf("\n");

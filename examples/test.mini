@@ -8,7 +8,7 @@ func add_two(x: int, y: int) int {
 func main() int {
     num := -1 + 2 * 3;
     // Return value in variable `num` as status code
-    // return num;
+    return num;
 }
 
 /*

@@ -8,6 +8,15 @@
 
 symbol_table *global_scope = NULL;
 
+const char *symbol_strings[] = {
+    [SYMBOL_VARIABLE] = "[VARIABLE]",
+    [SYMBOL_FUNCTION] = "[FUNCTION]",
+};
+
+const char *symbol_as_str(symbol_type type) {
+    return symbol_strings[type];
+}
+
 uint64_t hash(char *s) {
     uint64_t hash = 5381;
     int c;
@@ -49,14 +58,14 @@ symbol_table *symbol_table_create(char *name) {
     return table;
 }
 
-symbol_info *symbol_table_insert(symbol_table *table, char *symbol_name, ast_node_type type) {
+symbol_info *symbol_table_insert(symbol_table *table, char *symbol_name, symbol_type type) {
     if (!table) return NULL;
 
     // Check if the symbol already exists in one of the current table or parent tables.
     // If the symbol is a function, ignore this check as we will still add it to its own
     // scope to allow for recursion.
     symbol_info *exists = NULL;
-    if ((exists = symbol_table_lookup(table, symbol_name)) && type != NODE_FUNCTION) {
+    if ((exists = symbol_table_lookup(table, symbol_name)) && type != SYMBOL_FUNCTION) {
         return NULL;
     }
 
@@ -124,7 +133,7 @@ void symbol_table_dump_impl(symbol_table *table, int level) {
             for (int i = 0; i < level; i++) {
                 printf("    ");
             }
-            printf("{ name: %s, type: %s }", info->name, node_as_str(info->type));
+            printf("{ name: %s, type: %s }", info->name, symbol_as_str(info->type));
             if (info->next) {
                 printf("  ->  ");
             } else {

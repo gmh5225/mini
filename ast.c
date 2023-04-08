@@ -37,9 +37,11 @@ const char *type_strings[] = {
 
 const char *node_strings[] = {
     [NODE_PROGRAM] = "[PROGRAM]",
+    [NODE_TYPEDEF] = "[TYPEDEF]",
     [NODE_BLOCK] = "[BLOCK]",
-    [NODE_VARIABLE] = "[VARIABLE]",
-    [NODE_FUNCTION] = "[FUNCTION]",
+    [NODE_VARIABLE_DECLARATION] = "[VARIABLE_DECLARATION]",
+    [NODE_VARIABLE_ASSIGNMENT] = "[VARIABLE_ASSIGNMENT]",
+    [NODE_FUNCTION_DECLARATION] = "[FUNCTION_DECLARATION]",
     [NODE_FUNCTION_CALL] = "[FUNCTION_CALL]",
     [NODE_CONDITIONAL] = "[CONDITIONAL]",
     [NODE_EXPRESSION] = "[EXPRESSION]",
@@ -88,10 +90,10 @@ void ast_dump_impl(ast_node *root, int level) {
 
     printf("%s: ", node_as_str(root->type));
     switch (root->type) {
-        case NODE_VARIABLE:
+        case NODE_VARIABLE_DECLARATION:
             print_variable(&AS_VAR(root));
             break;
-        case NODE_FUNCTION:
+        case NODE_FUNCTION_DECLARATION:
             print_function(&AS_FUNC(root));
             break;
         case NODE_RETURN_STATEMENT:
@@ -195,5 +197,3 @@ void print_binary_expression(binary_expr *binary) {
     print_expression(binary->rhs);
     printf(")");
 }
-
-#undef INDENT

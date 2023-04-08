@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// # bytes
+// Directives to allocate memory (in # bytes)
 enum {
     DB = 1, DW = 2, DD = 4, DQ = 8,
     DO = 16, DY = 32, DZ = 64,
@@ -52,7 +52,7 @@ void target_asm_generate_code(target_asm *out, ast_node *root) {
     target_asm_add_section(out, ".data");
     for (size_t i = 0; i < SYMBOL_TABLE_SIZE; i++) {
         symbol_info *symbol = global_scope->symbols[i];
-        if (symbol->name && symbol->type == NODE_VARIABLE) {
+        if (symbol->name && symbol->type == SYMBOL_VARIABLE) {
 
             bool allocated = false;
             for (int sz = DB; sz <= DZ; sz <<= 1) {
@@ -81,7 +81,6 @@ void target_asm_generate_code(target_asm *out, ast_node *root) {
 void target_asm_add_section(target_asm *out, char *section_name) {
     const char *section_text = "section ";
     write_bytes(out, section_text, strlen(section_text));
-    write_bytes(out, " ", 1);
     write_bytes(out, section_name, strlen(section_name));
     write_bytes(out, "\n\n", 2);
 }
