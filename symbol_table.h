@@ -11,6 +11,7 @@
 typedef struct symbol_info {
     char *name;
     ast_node_type type;
+    int size;
     int offset;
     bool is_constant;
     bool is_initialized;

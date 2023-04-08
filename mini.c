@@ -37,13 +37,27 @@ int main(int argc, char **argv) {
     }
 
     char *source_code = read_whole_file(input_filename);
-
     global_scope = symbol_table_create("__GLOBAL__");
     ast_node *ast = parse_program(source_code);
+
+#ifdef DEBUG
+    printf("AST for file '%s':\n", input_filename);
+    ast_dump(ast);
+    printf("\n");
+    
+    printf("Symbol Table(s):\n");
     symbol_table_dump(global_scope);
+    printf("\n");
+#endif
+
+    target_asm output = {0};
+    target_asm_init(&output, TARGET_LINUX_NASM_X86_64);
 
     printf("compiling to %s\n", output_filename);
+    target_asm_generate_code(&output, ast);
+    target_asm_write_to_file(&output, output_filename);
 
-    if (source_code) { free(source_code); }
+    target_asm_free(&output);
+    free(source_code);
     return 0;
 }

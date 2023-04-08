@@ -22,6 +22,7 @@ static symbol_info *symbol_info_create(void) {
     symbol->name = NULL;
     symbol->type = 0;
     symbol->offset = -1;
+    symbol->size = 0;
     symbol->is_constant = false;
     symbol->is_initialized = false;
     symbol->next = NULL;

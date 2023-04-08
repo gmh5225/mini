@@ -53,7 +53,7 @@ struct variable {
     char *name;
     type_info type;
     bool is_pointer;
-    ast_node *assignment;
+    expression *assignment;
 };
 
 struct function_param {
@@ -149,5 +149,7 @@ const char *unary_as_str(unary_op op);
 const char *binary_as_str(binary_op op);
 const char *type_as_str(type_kind kind);
 const char *node_as_str(ast_node_type type);
+
+void ast_dump(ast_node *ast);
 
 #endif

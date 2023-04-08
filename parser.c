@@ -113,40 +113,6 @@ type_info parse_type() {
     return type;
 }
 
-void print_expr_impl(expression *expr) {
-    switch (expr->type) {
-        case EXPR_BOOL:
-            printf("BOOL(%s)", expr->as.boolean ? "true" : "false");
-            break;
-        case EXPR_INT:
-            printf("INT(%d)", expr->as.integer);
-            break;
-        case EXPR_UNARY:
-            printf("UNARY(%s", unary_as_str(expr->as.unary.op));
-            print_expr_impl(expr->as.unary.expr);
-            printf(")");
-            break;
-        case EXPR_BINARY:
-            printf("BINARY(");
-            print_expr_impl(expr->as.binary.lhs);
-            printf(" %s ", binary_as_str(expr->as.binary.op));
-            print_expr_impl(expr->as.binary.rhs);
-            printf(")");
-            break;
-        case EXPR_VAR:
-            printf("VAR(%s)", expr->as.string.data);
-            break;
-        default: 
-            printf("[UNKNOWN EXPR TYPE]");
-    }
-}
-
-void print_expr(expression *expr) {
-    if (!expr) return;
-    print_expr_impl(expr);
-    printf("\n");
-}
-
 void push_expr_stack(ast_node *exprs, ast_node *expr) {
     add_ast_child(exprs, expr);
 }
@@ -309,14 +275,14 @@ ast_node *parse_variable() {
     // Parse initial expression here and infer type from this expression,
     // or just parse type (uninitialized)
     if (match(TOKEN_WALRUS)) {
-        AS_VAR(var).assignment = parse_expression();
+        AS_VAR(var).assignment = &AS_EXPR(parse_expression());
         symbol->is_initialized = true;
     } else {
         expect(TOKEN_COLON);
         AS_VAR(var).type = parse_type();
 
         if (match(TOKEN_EQUAL)) {
-            AS_VAR(var).assignment = parse_expression();
+            AS_VAR(var).assignment = &AS_EXPR(parse_expression());
             symbol->is_initialized = true;
         }
     }
@@ -375,8 +341,13 @@ ast_node *parse_function() {
                 params = param;
             } else {
                 function_param *iter = params;
-                while (iter) { iter = iter->next; }
-                iter = param;
+                for (;;) {
+                    if (!iter->next) {
+                        iter->next = param;
+                        break;
+                    }
+                    iter = iter->next;
+                }
             }
         } else {
             unexpected("function parameters");
