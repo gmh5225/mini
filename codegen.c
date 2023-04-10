@@ -2,21 +2,37 @@
 
 #define INDENT "    ", 4
 
-// Directives to allocate memory (in # bytes)
-enum {
-    DB = 1, DW = 2, DD = 4, DQ = 8,
-    DO = 16, DY = 32, DZ = 64,
+// NASM x86_64 (Linux)
+
+enum { R_RAX, R_RBX, R_RCX, R_RDX,
+    R_RSP, R_RBP, R_RSI, R_RDI, 
+    R_R8, R_R9, R_R10, R_R11, R_R12 };
+
+static const Register registers_x86_64[] = {
+    [R_RAX] = { "rax", false, true, NULL },
+    [R_RBX] = { "rbx", true, false, NULL },
+    [R_RCX] = { "rcx", false, true, NULL },
+    [R_RDX] = { "rdx", false, true, NULL },
+    [R_RSP] = { "rsp", true, false, NULL },
+    [R_RBP] = { "rbp", true, false, NULL },
+    [R_RSI] = { "rsi", false, true, NULL },
+    [R_RDI] = { "rdi", false, true, NULL },
+    [R_R8]  = { "r8", false, true, NULL },
+    [R_R9]  = { "r9", false, true, NULL },
+    [R_R10] = { "r10", false, true, NULL },
+    [R_R11] = { "r11", false, true, NULL },
+    [R_R12] = { "r12", true, false, NULL },
 };
 
+// Directives to allocate memory (in # bytes)
+enum { DB = 1, DW = 2, DD = 4, DQ = 8,
+    DO = 16, DY = 32, DZ = 64 };
 const char *data_alloc_directive[] = {
     [DB] = "db", [DW] = "dw", [DD] = "dd", [DQ] = "dq",
     [DO] = "do", [DY] = "dy", [DZ] = "dz",
 };
 
-enum {
-    RESB = 1, RESD = 4, RESQ = 8,
-};
-
+enum { RESB = 1, RESD = 4, RESQ = 8 };
 const char *bss_alloc_directive[] = {
     [RESB] = "resb", [RESD] = "resd", [RESQ] = "resq",
 };
@@ -24,10 +40,7 @@ const char *bss_alloc_directive[] = {
 const char *target_strings[] = {
     [TARGET_LINUX_NASM_X86_64] = "linux_nasm_x86_64",
 };
-
-const char *target_as_str(TargetKind kind) {
-    return target_strings[kind];
-}
+const char *target_as_str(TargetKind kind) { return target_strings[kind]; }
 
 static void write_bytes(TargetASM *out, const char *bytes, size_t length) {
     if (out->code_length + length >= out->code_capacity) {
@@ -42,15 +55,107 @@ static void write_bytes(TargetASM *out, const char *bytes, size_t length) {
     out->code_length += length;
 }
 
+static Register *next_register(TargetASM *out) {
+    return NULL;
+}
+
+static void add_section(TargetASM *out, char *section_name) {
+    const char *section_text = "section ";
+    write_bytes(out, section_text, strlen(section_text));
+    write_bytes(out, section_name, strlen(section_name));
+    write_bytes(out, "\n", 2);
+}
+
+static void add_label(TargetASM *out, char *label_name) {
+    write_bytes(out, label_name, strlen(label_name));
+    write_bytes(out, ":\n", 2);
+}
+
+static void add_instruction(TargetASM *out, char *inst, char *op1, char *op2) {
+    write_bytes(out, INDENT);
+    write_bytes(out, inst, strlen(inst));
+
+    if (op1) { 
+        write_bytes(out, " ", 1);
+        write_bytes(out, op1, strlen(op1)); 
+    }
+
+    if (op2) { 
+        write_bytes(out, ", ", 1);
+        write_bytes(out, op2, strlen(op2));
+    }
+
+    write_bytes(out, "\n", 1);
+}
+
+static void generate_function(TargetASM *out, FuncDecl *func) {
+    if (strcmp(func->name, "main") == 0) {
+        add_label(out, "_start");
+    } else {
+        add_label(out, func->name);
+    }
+}
+
+static void generate_variable(TargetASM *out, VarDecl *var) {
+    if (symbol_table_lookup(global_scope, var->name)) return;
+    error("stack local variable initialization not yet supported!");
+}
+
+static void generate(TargetASM *out, Node *root) {
+    if (!root) return;
+
+    switch (root->kind) {
+        case NODE_FUNC_DECL:
+            generate_function(out, &root->func_decl);
+            break;
+        case NODE_VAR_DECL:
+            generate_variable(out, &root->var_decl);
+            break;
+        default:
+            error("cannot generate code for node type: %d", root->kind);
+    }
+
+    generate(out, root->next);
+}
+
 void target_asm_init(TargetASM *out, TargetKind kind) {
     out->kind = kind;
     out->generated_code = calloc(DEFAULT_TARGET_CODE_CAPACITY, sizeof(char));
     out->code_length = 0;
     out->code_capacity = DEFAULT_TARGET_CODE_CAPACITY;
+
+    // Create register stack to keep track of what registers we can use, 
+    // placing the scratch registers at the top of the stack.
+    Register scratch = {0};
+    Register preserved = {0};
+    Register *cur = &scratch;
+    Register *save = &preserved;
+    for (int id = R_RAX; id <= R_R12; id++) {
+        Register *reg = malloc(sizeof(Register));
+        *reg = registers_x86_64[id];
+
+        if (reg->is_preserved) {
+            save = save->next = reg;
+        } else {
+            cur = cur->next = reg;
+        }
+    }
+    cur = cur->next = preserved.next;
+    out->registers = scratch.next;
+
+#ifdef DEBUG
+    printf("Open Registers:\n");
+    Register *iter = out->registers;
+    while (iter) {
+        printf("%*s%s\t%s\n", 4, "",
+                iter->name, iter->is_preserved ? "preserved" : "scratch");
+        iter = iter->next;
+    }
+#endif
 }
 
 // Generate code using `root` and the `global_scope` symbol table
-void target_asm_generate_code(TargetASM *out, Node *root) {
+void target_asm_generate_code(TargetASM *out, Node *program) {
     // Initialize global variables.
     // Since we do not have constant folding implemented yet,
     // we store all global variables in the bss section for now and compute their values
@@ -59,7 +164,7 @@ void target_asm_generate_code(TargetASM *out, Node *root) {
     // TODO: Create two buffers, one for .data and one for .bss, and append to them
     // in one pass over the global symbol table. Once done, we can write them both
     // to the generated_code array.
-    target_asm_add_section(out, ".bss");
+    add_section(out, ".bss");
     for (size_t i = 0; i < SYMBOL_TABLE_SIZE; i++) {
         Symbol *symbol = global_scope->symbols[i];
         if (symbol->name && symbol->kind == SYMBOL_VARIABLE) {
@@ -134,38 +239,11 @@ void target_asm_generate_code(TargetASM *out, Node *root) {
     }
 
     // Generate code for entry point of program
-    target_asm_add_section(out, ".text");
-    target_asm_add_instruction(out, "global", "_start", NULL);
-    target_asm_add_label(out, "_start");
-}
+    add_section(out, ".text");
+    add_instruction(out, "global", "_start", NULL);
 
-void target_asm_add_section(TargetASM *out, char *section_name) {
-    const char *section_text = "section ";
-    write_bytes(out, section_text, strlen(section_text));
-    write_bytes(out, section_name, strlen(section_name));
-    write_bytes(out, "\n", 2);
-}
-
-void target_asm_add_label(TargetASM *out, char *label_name) {
-    write_bytes(out, label_name, strlen(label_name));
-    write_bytes(out, ":\n", 2);
-}
-
-void target_asm_add_instruction(TargetASM *out, char *inst, char *op1, char *op2) {
-    write_bytes(out, INDENT);
-    write_bytes(out, inst, strlen(inst));
-
-    if (op1) { 
-        write_bytes(out, " ", 1);
-        write_bytes(out, op1, strlen(op1)); 
-    }
-
-    if (op2) { 
-        write_bytes(out, ", ", 1);
-        write_bytes(out, op2, strlen(op2));
-    }
-
-    write_bytes(out, "\n", 1);
+    // Generate the program recursively
+    generate(out, program);
 }
 
 void target_asm_write_to_file(TargetASM *out, char *output_filename) {
@@ -187,4 +265,11 @@ void target_asm_free(TargetASM *out) {
         out->generated_code = NULL;
     }
     out->code_length = out->code_capacity = 0;
+
+    Register *iter = out->registers;
+    while (iter) {
+        Register *temp = iter->next;
+        free(iter);
+        iter = temp;
+    }
 }

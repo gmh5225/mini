@@ -251,18 +251,24 @@ const char *target_as_str(TargetKind kind);
 
 #define DEFAULT_TARGET_CODE_CAPACITY 2048
 
+typedef struct Register Register;
+struct Register {
+    char *name;
+    bool is_preserved;
+    bool is_open;
+    Register *next;
+};
+
 typedef struct {
     TargetKind kind;
     char *generated_code;
     size_t code_length;
     size_t code_capacity;
+    Register *registers;
 } TargetASM;
 
 void target_asm_init(TargetASM *out, TargetKind kind);
 void target_asm_generate_code(TargetASM *out, Node *program);
-void target_asm_add_section(TargetASM *out, char *section_name);
-void target_asm_add_label(TargetASM *out, char *label_name);
-void target_asm_add_instruction(TargetASM *out, char *inst, char *op1, char *op2);
 void target_asm_write_to_file(TargetASM *out, char *output_filename);
 void target_asm_free(TargetASM *out);
 

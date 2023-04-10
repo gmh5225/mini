@@ -1,4 +1,4 @@
-const something: bool = false;
+const foo: bool = false;
 
 //
 //func add_two(x: int, y: int) -> int {
@@ -16,6 +16,9 @@ func main() -> int {
  ================================
  | output for linux_nasm_x86_64 |
  ================================
+ section .data
+     foo db 0
+
  section .text
      global _start
  

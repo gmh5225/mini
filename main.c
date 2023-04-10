@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
     }
 
     printf("compiling to `%s`\n", opts.output_filename);
-    TargetASM target = {0};
+    TargetASM target;
     target_asm_init(&target, TARGET_LINUX_NASM_X86_64);
     target_asm_generate_code(&target, program);
 
