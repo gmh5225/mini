@@ -27,10 +27,12 @@ MiniOptions parse_mini_options(int argc, char **argv) {
 
         if (strcmp(arg, "-T") == 0) {
             opts.dump_flags |= DUMP_TOKENS;
+            continue;
         }
 
         if (strcmp(arg, "-A") == 0) {
             opts.dump_flags |= DUMP_AST;
+            continue;
         }
 
         opts.input_filename = arg;
