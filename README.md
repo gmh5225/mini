@@ -1,6 +1,6 @@
 # mini
 
-A very small compiler for a very simple language.
+A compiler for a C-like programming language
 
 ## Building
 

@@ -1,0 +1,376 @@
+#include "mini.h"
+
+static SymbolTable *current_scope;  // The current scope of the parser
+static TokenStream *tokens;         // The stream of tokens to parse
+static Node *stack_top;             // The top of the expression stack
+
+void enter_scope(SymbolTable *new_scope) {
+    current_scope = new_scope;
+}
+
+void exit_scope() {
+    current_scope = current_scope->parent;
+}
+
+static Token *tok() {
+    return token_stream_get(tokens);
+}
+
+static Token *consume() {
+    return token_stream_next(tokens);
+}
+
+static Token *match(TokenKind want) {
+    bool matches = tok()->kind == want;
+    if (matches) return consume();
+    return NULL;
+}
+
+static Token *expect(TokenKind expected) {
+    Token *curr = consume();
+    if (curr->kind != expected) {
+        error_at_token(curr, "expected `%s`, got `%s`",
+                token_as_str(expected), token_as_str(curr->kind));
+    }
+    return curr;
+}
+
+static Node *make_node(NodeKind kind) {
+    Node *node = calloc(1, sizeof(Node));
+    node->kind = kind;
+    return node;
+}
+
+void push_expr_node(Node *expr) {
+    if (!stack_top) {
+        stack_top = expr;
+    } else {
+        Node *temp = stack_top;
+        stack_top = expr;
+        stack_top->next = temp;
+    }
+}
+
+Node *pop_expr_node() {
+    Node *ret = stack_top;
+    stack_top = stack_top->next;
+    // Propagate inner-most expression type to outer expressions
+    if (stack_top) {
+        stack_top->type = ret->type;
+    }
+    return ret;
+}
+
+static void parse_factor();
+static void parse_term();
+
+static Node *parse_unary_expr(char un_op) {
+    Node *node = make_node(NODE_UNARY_EXPR);
+    node->unary.un_op = un_op;
+    node->unary.expr = pop_expr_node();
+    return node;
+}
+
+static Node *parse_binary_expr(char bin_op) {
+    Node *node = make_node(NODE_BINARY_EXPR);
+    node->binary.bin_op = bin_op;
+
+    node->binary.lhs = pop_expr_node();
+    parse_term(tokens);
+    node->binary.rhs = pop_expr_node();
+
+    // TODO: add typechecking here
+    //Type lhs_type = node->binary.lhs->type;
+    //Type rhs_type = node->binary.rhs->type;
+    //if (!types_equal(lhs_type, rhs_type)) {
+    //    error_at_token(tokens, "type mismatch in binary expression");
+    //}
+
+    return node;
+}
+
+static void parse_factor() {
+    Node *node = make_node(NODE_LITERAL_EXPR);
+
+    switch (tok()->kind) {
+        case TOKEN_IDENTIFIER:
+            // Check to see if the variable we are referencing is valid
+            char *var_name = consume()->str.data;
+            Symbol *var_sym = symbol_table_lookup(current_scope, var_name);
+            if (!var_sym) {
+                error_at_token(tok(), "unknown symbol `%s`", var_name);
+            }
+            node->kind = NODE_REF_EXPR;
+            node->type = var_sym->type;
+            node->ref = var_name;
+            break;
+        case TOKEN_NUMBER:
+            // TODO: Infer type from number here.
+            // For now, we just assume its an `int`
+            node->type = primitive_types[TYPE_INT];
+            node->literal.i_val = consume()->i_val;
+            break;
+        default:
+            error_at_token(tok(), "invalid token `%s` while parsing expression",
+                    token_as_str(tok()->kind));
+    }
+
+    push_expr_node(node);
+}
+
+void parse_term() {
+    parse_factor();
+    for (;;) {
+        char bin_op = 0;
+        switch (tok()->kind) {
+            case TOKEN_STAR:
+                bin_op = '*'; consume();
+                break;
+            case TOKEN_SLASH:
+                bin_op = '/'; consume();
+                break;
+            default: break;
+        }
+
+        if (bin_op == 0) break;
+        push_expr_node(parse_binary_expr(bin_op));
+    }
+}
+
+static Node *parse_expression() {
+    char un_op = 0;
+    switch (tok()->kind) {
+        case TOKEN_MINUS: 
+            un_op = '-'; consume();
+            break;
+        case TOKEN_BANG: 
+            un_op = '!'; consume();
+            break;
+        case TOKEN_STAR: 
+            un_op = '*'; consume();
+            break;
+        default: break;
+    }
+
+    parse_term();
+
+    if (un_op > 0) {
+        push_expr_node(parse_unary_expr(un_op));
+    }
+
+    for (;;) {
+        char bin_op = 0;
+        switch (tok()->kind) {
+            case TOKEN_PLUS:
+                bin_op = '+'; consume();
+                break;
+            case TOKEN_MINUS:
+                bin_op = '-'; consume();
+                break;
+            default: break;
+        }
+
+        if (bin_op == 0) break;
+        push_expr_node(parse_binary_expr(bin_op));
+    }
+
+    return pop_expr_node();
+}
+
+static Type parse_type() {
+    char *type_name = expect(TOKEN_IDENTIFIER)->str.data;
+
+    // Search for type symbol in current scope
+    Symbol *type_sym = symbol_table_lookup(current_scope, type_name);
+    if (!type_sym) {
+        error_at_token(tok(), "unknown type `%s`", type_name);
+    }
+    return type_sym->type;
+}
+
+static Node *parse_variable_declaration(char *var_name) {
+    // Check if the variable is a constant and parse identifier if not yet parsed
+    bool is_constant = false;
+    if (!var_name) {
+        expect(TOKEN_CONST);
+        is_constant = true;
+        var_name = expect(TOKEN_IDENTIFIER)->str.data;
+    }
+
+    Node *node = make_node(NODE_VAR_DECL);
+    node->var_decl.name = var_name;
+    node->var_decl.type = primitive_types[TYPE_VOID];
+
+    // Insert variable into current scope
+    Symbol *var_sym = symbol_table_insert(current_scope, var_name, SYMBOL_VARIABLE);
+    if (!var_sym) {
+        error_at_token(tok(), "variable `%s` redeclared in scope", var_name);
+    }
+    var_sym->is_constant = is_constant;
+
+    // Parse assignment and/or type declaration of variable
+    if (match(TOKEN_WALRUS)) {
+        // num := -1 + 2 * 3
+        node->var_decl.init = parse_expression();
+        var_sym->is_initialized = true;
+    } else {
+        /*
+num: int
+-- or --
+num: int = -1 * 2 * 3
+*/
+        expect(TOKEN_COLON);
+        node->var_decl.type = parse_type();
+
+        if (match(TOKEN_EQUAL)) {
+            node->var_decl.init = parse_expression();
+            var_sym->is_initialized = true;
+        }
+    }
+
+    return node;
+}
+
+static Node *parse_function_call(char *func_name) {
+    return NULL;
+}
+
+static Node *parse_function_declaration() {
+    consume(); // consume keyword `func`
+    char *func_name = expect(TOKEN_IDENTIFIER)->str.data;
+
+    // Parse identifier
+    Node *node = make_node(NODE_FUNC_DECL);
+    node->func_decl.name = func_name;
+    node->func_decl.return_type = primitive_types[TYPE_VOID];
+
+    // Insert function into current scope
+    Symbol *func_sym = symbol_table_insert(current_scope, func_name, SYMBOL_FUNCTION);
+    if (!func_sym) {
+        error_at_token(tok(), "function `%s` redeclared in scope", func_name);
+    }
+
+    // Create function scope
+    SymbolTable *func_scope = symbol_table_create(func_name);
+
+    // Insert function into its own scope for recursion
+    symbol_table_insert(func_scope, func_name, SYMBOL_FUNCTION);
+
+    // Add function scope as child of current scope
+    symbol_table_add_child(current_scope, func_scope);
+
+    // Parse parameters
+    Node params = {0};
+    Node *cur = &params;
+
+    expect(TOKEN_LPAREN);
+    while (tok()->kind != TOKEN_RPAREN) {
+        char *param_name = expect(TOKEN_IDENTIFIER)->str.data;
+
+        // Parse identifier
+        Node *node = make_node(NODE_VAR_DECL);
+        node->var_decl.name = param_name;
+
+        // Add paramter to function scope as a variable
+        Symbol *param_sym = symbol_table_insert(func_scope, param_name, SYMBOL_VARIABLE);
+        if (!param_sym) {
+            error_at_token(tok(), "function parameter `%s` redeclared");
+        }
+
+        // Parse type
+        expect(TOKEN_COLON);
+        node->var_decl.type = parse_type();
+
+        // Add paramter to list
+        cur = cur->next = node;
+
+        // If there is no comma after this parameter, we are done with parsing parameters
+        if (tok()->kind != TOKEN_COMMA) {
+            break;
+        }
+
+        // Otherwise, consume the comma token and keep going
+        consume();
+    }
+    expect(TOKEN_RPAREN);
+    node->func_decl.params = params.next;
+
+    // Parse function return type (if no arrow, it's TYPE_VOID)
+    if (match(TOKEN_ARROW)) {
+        node->func_decl.return_type = parse_type();
+    }
+
+    // Parse function body
+    expect(TOKEN_LBRACE);
+
+    // Enter the function's scope
+    enter_scope(func_scope);
+
+    Node body = {0};
+    cur = &body;
+
+    while (tok()->kind != TOKEN_RBRACE) {
+        Node *stmt = NULL;
+        switch (tok()->kind) {
+            case TOKEN_RBRACE: break;
+            case TOKEN_CONST:
+                stmt = parse_variable_declaration(NULL);
+                break;
+            case TOKEN_IDENTIFIER:
+                char *identifier = consume()->str.data;
+                stmt = (tok()->kind == TOKEN_LPAREN) ?
+                    parse_function_call(identifier) :
+                    parse_variable_declaration(identifier);
+                break;
+            case TOKEN_RETURN:
+                consume();
+                stmt = make_node(NODE_RET_STMT);
+                stmt->ret_stmt.value = parse_expression();
+                break;
+            default:
+                error_at_token(tok(), "invalid token `%s` while parsing function body",
+                        token_as_str(tok()->kind));
+        }
+
+        if (!stmt) break;
+
+        expect(TOKEN_SEMICOLON);
+        cur = cur->next = stmt;
+    }
+    expect(TOKEN_RBRACE);
+    node->func_decl.body = body.next;
+
+    // Exit the function's scope
+    exit_scope();
+
+    return node;
+}
+
+Node *parse(TokenStream *stream) {
+    current_scope = global_scope;
+    tokens = stream;
+
+    Node ast = {0};
+    Node *cur = &ast;
+
+    while (tok()->kind != TOKEN_EOF) {
+        Node *decl = NULL;
+        switch (tok()->kind) {
+            case TOKEN_FUNC:
+                decl = parse_function_declaration();
+                break;
+            case TOKEN_CONST:
+                decl = parse_variable_declaration(NULL);
+                break;
+            case TOKEN_IDENTIFIER:
+                decl = parse_variable_declaration(consume()->str.data);
+                break;
+            default:
+                error_at_token(tok(), "invalid token `%s` while parsing top-level",
+                        token_as_str(tok()->kind));
+        }
+        cur = cur->next = decl;
+    }
+
+    return ast.next;
+}

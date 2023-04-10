@@ -1,11 +1,12 @@
-const something: bool = false;
-
-func add_two(x: int, y: int) int {
+// const something: bool = false;
+/*
+func add_two(x: int, y: int) -> int {
     return x + y;
 }
+*/
 
 // This is a comment
-func main() int {
+func main() -> int {
     num := -1 + 2 * 3;
     // Return value in variable `num` as status code
     return num;

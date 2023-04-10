@@ -1,10 +1,4 @@
-#include "codegen.h"
-#include "util.h"
-
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "mini.h"
 
 // Directives to allocate memory (in # bytes)
 enum {
@@ -21,11 +15,11 @@ const char *target_strings[] = {
     [TARGET_LINUX_NASM_X86_64] = "linux_nasm_x86_64",
 };
 
-const char *target_as_str(target_type type) {
-    return target_strings[type];
+const char *target_as_str(TargetKind kind) {
+    return target_strings[kind];
 }
 
-static void write_bytes(target_asm *out, const char *bytes, size_t length) {
+static void write_bytes(TargetASM *out, const char *bytes, size_t length) {
     if (out->code_length + length >= out->code_capacity) {
         out->code_capacity <<= 1;
         void *tmp = realloc(out->generated_code, sizeof(char) * out->code_capacity);
@@ -38,21 +32,21 @@ static void write_bytes(target_asm *out, const char *bytes, size_t length) {
     out->code_length += length;
 }
 
-void target_asm_init(target_asm *out, target_type type) {
-    out->type = type;
+void target_asm_init(TargetASM *out, TargetKind kind) {
+    out->kind = kind;
     out->generated_code = calloc(DEFAULT_TARGET_CODE_CAPACITY, sizeof(char));
     out->code_length = 0;
     out->code_capacity = DEFAULT_TARGET_CODE_CAPACITY;
 }
 
 // Generate code using `root` and the `global_scope` table defined in symbol_table.c
-void target_asm_generate_code(target_asm *out, ast_node *root) {
+void target_asm_generate_code(TargetASM *out, ASTNode *root) {
     // Initialize global variables
     // TODO: add support for global structures
     target_asm_add_section(out, ".data");
     for (size_t i = 0; i < SYMBOL_TABLE_SIZE; i++) {
-        symbol_info *symbol = global_scope->symbols[i];
-        if (symbol->name && symbol->type == SYMBOL_VARIABLE) {
+        SymbolInfo *symbol = global_scope->symbols[i];
+        if (symbol->name && symbol->kind == SYMBOL_VARIABLE) {
 
             bool allocated = false;
             for (int sz = DB; sz <= DZ; sz <<= 1) {
@@ -78,19 +72,19 @@ void target_asm_generate_code(target_asm *out, ast_node *root) {
     target_asm_add_label(out, "_start");
 }
 
-void target_asm_add_section(target_asm *out, char *section_name) {
+void target_asm_add_section(TargetASM *out, char *section_name) {
     const char *section_text = "section ";
     write_bytes(out, section_text, strlen(section_text));
     write_bytes(out, section_name, strlen(section_name));
     write_bytes(out, "\n\n", 2);
 }
 
-void target_asm_add_label(target_asm *out, char *label_name) {
+void target_asm_add_label(TargetASM *out, char *label_name) {
     write_bytes(out, label_name, strlen(label_name));
     write_bytes(out, ":\n", 2);
 }
 
-void target_asm_add_instruction(target_asm *out, char *inst, char *op1, char *op2) {
+void target_asm_add_instruction(TargetASM *out, char *inst, char *op1, char *op2) {
     write_bytes(out, "\t", 1);
     write_bytes(out, inst, strlen(inst));
     if (op1) { write_bytes(out, op1, strlen(op1)); }
@@ -98,7 +92,7 @@ void target_asm_add_instruction(target_asm *out, char *inst, char *op1, char *op
     write_bytes(out, "\n", 1);
 }
 
-void target_asm_write_to_file(target_asm *out, char *output_filename) {
+void target_asm_write_to_file(TargetASM *out, char *output_filename) {
     FILE *f = fopen(output_filename, "w");
     if (!f) {
         fail("couldn't open output file '%s' for writing");
@@ -111,7 +105,7 @@ void target_asm_write_to_file(target_asm *out, char *output_filename) {
     fclose(f);
 }
 
-void target_asm_free(target_asm *out) {
+void target_asm_free(TargetASM *out) {
     if (out->generated_code) {
         free(out->generated_code);
     }
