@@ -374,3 +374,78 @@ Node *parse(TokenStream *stream) {
 
     return ast.next;
 }
+
+static void dump_ast_impl(Node *root, int level) {
+    if (!root) return;
+
+    // indent level
+    printf("%*s", level, "");
+
+    switch (root->kind) {
+        case NODE_UNKNOWN:
+            printf("[UNKNOWN]:\n");
+            break;
+        case NODE_FUNC_DECL:
+            printf("[FUNC_DECL]: name = %s, return_type = %s, params = [",
+                    root->func_decl.name,
+                    root->func_decl.return_type.name);
+            Node *param = root->func_decl.params;
+            for (;;) {
+                if (!param) break;
+                printf("name = %s, type = %s",
+                        param->var_decl.name,
+                        param->var_decl.type.name);
+                param = param->next;
+            }
+            printf("]\n");
+            dump_ast_impl(root->func_decl.body, level + 1);
+            break;
+        case NODE_VAR_DECL:
+            printf("[VAR_DECL]: name = %s, type = %s\n",
+                    root->var_decl.name,
+                    root->var_decl.type.name);
+            dump_ast_impl(root->var_decl.init, level + 1);
+            break;
+        case NODE_RET_STMT:
+            printf("[RET_STMT]:\n");
+            dump_ast_impl(root->ret_stmt.value, level + 1);
+            break;
+        case NODE_FUNC_CALL_EXPR:
+            printf("[FUNC_CALL]:");
+            break;
+        case NODE_ASSIGN_EXPR:
+            printf("[ASSIGN]:");
+            break;
+        case NODE_UNARY_EXPR:
+            printf("[UNARY]: op = %c\n", root->unary.un_op);
+            dump_ast_impl(root->unary.expr, level + 1);
+            break;
+        case NODE_BINARY_EXPR:
+            printf("[BINARY]: op = %c\n", root->binary.bin_op);
+            dump_ast_impl(root->binary.lhs, level + 1);
+            dump_ast_impl(root->binary.rhs, level + 1);
+            break;
+        case NODE_LITERAL_EXPR:
+            printf("[LITERAL]: value = ");
+            switch (root->type.kind) {
+                case TYPE_INT:
+                    printf("INT(%ld)", root->literal.i_val);
+                    break;
+                case TYPE_BOOL:
+                    printf("BOOL(%s)", root->literal.b_val ? "true" : "false");
+                    break;
+                default: error("invalid literal type!");
+            }
+            printf("\n");
+            break;
+        case NODE_REF_EXPR:
+            printf("[REF]: name = %s\n", root->ref);
+            break;
+        default: error("invalid AST!");
+    }
+}
+
+void dump_ast(Node *program) {
+    dump_ast_impl(program, 0);
+    printf("\n");
+}

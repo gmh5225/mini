@@ -170,9 +170,10 @@ static Token lex_alphabetic() {
     }
 
     // Token must be an identifier
-    token.str.data = calloc(len, sizeof(char));
-    token.str.length = len - 1;
+    token.str.data = calloc(len + 1, sizeof(char));
+    token.str.length = len;
     memcpy(token.str.data, buf, len);
+    token.str.data[len] = 0;
 
     return token;
 }
@@ -197,7 +198,7 @@ static Token lex_numeric() {
 
     // Token must be an identifier
     token.kind = TOKEN_NUMBER;
-    token.i_val = str_to_int(buf, len - 1);
+    token.i_val = str_to_int(buf, len);
     return token;
 }
 

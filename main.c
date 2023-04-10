@@ -49,10 +49,7 @@ int main(int argc, char **argv) {
 
     Node *ast = parse(&stream);
 #ifdef DEBUG
-    while (ast) {
-        printf("node_id: %d\n", ast->kind);
-        ast = ast->next;
-    }
+    dump_ast(ast);
 #endif
 
     return 0;

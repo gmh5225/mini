@@ -3,6 +3,7 @@
 
 #define MINI_VERSION "0.1.0"
 
+#include <assert.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -195,6 +196,7 @@ struct Node {
 };
 
 Node *parse(TokenStream *stream);
+void dump_ast(Node *program);
 
 /* symbols.c */
 typedef enum {
