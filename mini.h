@@ -274,4 +274,11 @@ void error_with_context(char *loc, const char *fmt, ...);
 
 int str_to_int(const char *s, size_t length);
 
+/* main.c */
+typedef struct {
+    int dump_flags;
+    char *input_filename;
+    char *output_filename;
+} MiniOptions;
+
 #endif
