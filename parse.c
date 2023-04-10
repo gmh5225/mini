@@ -110,6 +110,11 @@ static void parse_factor() {
             node->type = primitive_types[TYPE_INT];
             node->literal.i_val = consume()->i_val;
             break;
+        case TOKEN_TRUE:
+        case TOKEN_FALSE:
+            node->type = primitive_types[TYPE_BOOL];
+            node->literal.b_val = consume()->b_val;
+            break;
         default:
             error_at_token(tok(), "invalid token `%s` while parsing expression",
                     token_as_str(tok()->kind));
@@ -214,11 +219,6 @@ static Node *parse_variable_declaration(char *var_name) {
         node->var_decl.init = parse_expression();
         var_sym->is_initialized = true;
     } else {
-        /*
-num: int
--- or --
-num: int = -1 * 2 * 3
-*/
         expect(TOKEN_COLON);
         node->var_decl.type = parse_type();
 
@@ -228,6 +228,7 @@ num: int = -1 * 2 * 3
         }
     }
 
+    expect(TOKEN_SEMICOLON);
     return node;
 }
 
@@ -326,6 +327,7 @@ static Node *parse_function_declaration() {
                 consume();
                 stmt = make_node(NODE_RET_STMT);
                 stmt->ret_stmt.value = parse_expression();
+                expect(TOKEN_SEMICOLON);
                 break;
             default:
                 error_at_token(tok(), "invalid token `%s` while parsing function body",
@@ -333,8 +335,6 @@ static Node *parse_function_declaration() {
         }
 
         if (!stmt) break;
-
-        expect(TOKEN_SEMICOLON);
         cur = cur->next = stmt;
     }
     expect(TOKEN_RBRACE);
@@ -392,10 +392,11 @@ static void dump_ast_impl(Node *root, int level) {
             Node *param = root->func_decl.params;
             for (;;) {
                 if (!param) break;
-                printf("name = %s, type = %s",
+                printf("%s:%s",
                         param->var_decl.name,
                         param->var_decl.type.name);
                 param = param->next;
+                printf("%s", param ? ", " : "");
             }
             printf("]\n");
             dump_ast_impl(root->func_decl.body, level + 1);
@@ -443,6 +444,8 @@ static void dump_ast_impl(Node *root, int level) {
             break;
         default: error("invalid AST!");
     }
+
+    dump_ast_impl(root->next, level);
 }
 
 void dump_ast(Node *program) {

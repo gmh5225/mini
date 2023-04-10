@@ -162,11 +162,24 @@ static Token lex_alphabetic() {
     buf[len] = 0;
 
     // Check if token is a keyword
-    for (TokenKind kind = TOKEN_CONST; kind <= TOKEN_FALSE; kind++) {
+    for (TokenKind kind = TOKEN_CONST; kind <= TOKEN_ELSE; kind++) {
         if (memcmp(buf, token_as_str(kind), len) == 0) {
             token.kind = kind;
             return token;
         }
+    }
+
+    // Check if token is a literal
+    if (memcmp(buf, token_as_str(TOKEN_TRUE), len) == 0) {
+        token.kind = TOKEN_TRUE;
+        token.b_val = true;
+        return token;
+    }
+
+    if (memcmp(buf, token_as_str(TOKEN_FALSE), len) == 0) {
+        token.kind = TOKEN_FALSE;
+        token.b_val = false;
+        return token;
     }
 
     // Token must be an identifier

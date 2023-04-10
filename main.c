@@ -55,6 +55,7 @@ int main(int argc, char **argv) {
 
     init_global_scope();
     TokenStream stream = lex(file);
+    fclose(file);
 
     if (opts.dump_flags & DUMP_TOKENS) {
         for (;;) {
@@ -65,11 +66,19 @@ int main(int argc, char **argv) {
         stream.pos = 0; // reset stream pos after printing tokens
     }
 
-    Node *ast = parse(&stream);
+    Node *program = parse(&stream);
 
     if (opts.dump_flags & DUMP_AST) {
-        dump_ast(ast);
+        dump_ast(program);
     }
+
+    printf("compiling to `%s`\n", opts.output_filename);
+    TargetASM target = {0};
+    target_asm_init(&target, TARGET_LINUX_NASM_X86_64);
+    target_asm_generate_code(&target, program);
+
+    target_asm_write_to_file(&target, opts.output_filename);
+    target_asm_free(&target);
 
     return 0;
 }

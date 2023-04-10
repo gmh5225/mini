@@ -39,19 +39,18 @@ void target_asm_init(TargetASM *out, TargetKind kind) {
     out->code_capacity = DEFAULT_TARGET_CODE_CAPACITY;
 }
 
-// Generate code using `root` and the `global_scope` table defined in symbol_table.c
-void target_asm_generate_code(TargetASM *out, ASTNode *root) {
+// Generate code using `root` and the `global_scope` symbol table
+void target_asm_generate_code(TargetASM *out, Node *root) {
     // Initialize global variables
-    // TODO: add support for global structures
     target_asm_add_section(out, ".data");
     for (size_t i = 0; i < SYMBOL_TABLE_SIZE; i++) {
-        SymbolInfo *symbol = global_scope->symbols[i];
+        Symbol *symbol = global_scope->symbols[i];
         if (symbol->name && symbol->kind == SYMBOL_VARIABLE) {
 
             bool allocated = false;
             for (int sz = DB; sz <= DZ; sz <<= 1) {
-                if (symbol->size == sz) {
-                    const char *directive = mem_alloc_directive[symbol->size];
+                if (symbol->type.size == sz) {
+                    const char *directive = mem_alloc_directive[symbol->type.size];
                     write_bytes(out, "\t", 1);
                     write_bytes(out, symbol->name, strlen(symbol->name));
                     write_bytes(out, " ", 1);
@@ -61,7 +60,7 @@ void target_asm_generate_code(TargetASM *out, ASTNode *root) {
             }
 
             if (!allocated) {
-                fail("global struct initialization not yet supported!");
+                error("global struct initialization not yet supported!");
             }
         }
     }
@@ -95,12 +94,12 @@ void target_asm_add_instruction(TargetASM *out, char *inst, char *op1, char *op2
 void target_asm_write_to_file(TargetASM *out, char *output_filename) {
     FILE *f = fopen(output_filename, "w");
     if (!f) {
-        fail("couldn't open output file '%s' for writing");
+        error("couldn't open output file `%s` for writing");
     }
 
     size_t nwritten = fwrite(out->generated_code, sizeof(char), out->code_length, f);
     if (nwritten != out->code_length) {
-        fail("only wrote %zu/%zu bytes to file '%s'", nwritten, out->code_length, output_filename);
+        error("only wrote %zu/%zu bytes to file `%s`", nwritten, out->code_length, output_filename);
     }
     fclose(f);
 }

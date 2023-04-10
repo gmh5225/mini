@@ -1,6 +1,6 @@
 TARGET     = mini
 
-SRC        = main.c lex.c parse.c util.c types.c symbols.c # $(wildcard *.c)
+SRC        = $(wildcard *.c)
 OBJ        = $(SRC:.c=.o)
 DEP        = $(OBJ:.o=.d)
 CC         = gcc
