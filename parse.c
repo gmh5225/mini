@@ -217,6 +217,7 @@ static Node *parse_variable_declaration(char *var_name) {
     if (match(TOKEN_WALRUS)) {
         // num := -1 + 2 * 3
         node->var_decl.init = parse_expression();
+        var_sym->type = node->var_decl.init->type;
         var_sym->is_initialized = true;
     } else {
         expect(TOKEN_COLON);
@@ -224,6 +225,7 @@ static Node *parse_variable_declaration(char *var_name) {
 
         if (match(TOKEN_EQUAL)) {
             node->var_decl.init = parse_expression();
+            var_sym->type = node->var_decl.init->type;
             var_sym->is_initialized = true;
         }
     }
