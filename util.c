@@ -31,6 +31,19 @@ void error_at_token(Token *t, const char *fmt, ...) {
     exit(EXIT_FAILURE);
 }
 
+char *rand_str(size_t length) {
+    static const char alphabet[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+#define ALPHABET_LENGTH sizeof(alphabet)/sizeof(alphabet[0])
+    char *result = calloc(length + 1, sizeof(char));
+    for (size_t i = 0; i < length; i++) {
+        size_t index = rand() % ALPHABET_LENGTH;
+        result[i] = alphabet[index];
+    }
+    result[length] = 0;
+    return result;
+#undef ALPHABET_LENGTH
+}
+
 int str_to_int(const char *s, size_t length) {
     int n = 0;
     for (size_t i = 0; i < length; i++) {

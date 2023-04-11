@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX(x, y) (x > y) ? x : y
 #define MIN(x, y) (x > y) ? y : x
@@ -60,6 +61,7 @@ const char *token_as_str(TokenKind kind);
 #define IDENTIFIER_MAX_LEN  256
 #define NUMBER_MAX_LEN      256
 #define STRING_MAX_LEN      4096
+
 
 typedef struct Token Token;
 struct Token {
@@ -150,13 +152,39 @@ typedef struct {
 } VarDecl;
 
 typedef struct {
+    char *name;
+    Node *value;
+} AssignExpr;
+
+typedef struct {
     Node *value;
 } RetStmt;
+
+typedef struct {
+    char un_op;
+    Node *expr;
+} UnaryExpr;
+
+typedef struct {
+    char bin_op;
+    Node *lhs;
+    Node *rhs;
+} BinaryExpr;
+
+typedef union {
+    intmax_t i_val;
+    uintmax_t u_val;
+    float f_val;
+    double d_val;
+    char c_val;
+    bool b_val;
+} Literal;
 
 typedef enum {
     NODE_UNKNOWN,
     NODE_FUNC_DECL,
     NODE_VAR_DECL,
+    NODE_IF_STMT,
     NODE_RET_STMT,
     NODE_FUNC_CALL_EXPR,
     NODE_ASSIGN_EXPR,
@@ -174,23 +202,10 @@ struct Node {
         FuncDecl func_decl;
         VarDecl var_decl;
         RetStmt ret_stmt;
-        struct {
-            char un_op;
-            Node *expr;
-        } unary;
-        struct {
-            char bin_op;
-            Node *lhs;
-            Node *rhs;
-        } binary;
-        struct {
-            intmax_t i_val;
-            uintmax_t u_val;
-            float f_val;
-            double d_val;
-            char c_val;
-            bool b_val;
-        } literal;
+        AssignExpr assign;
+        UnaryExpr unary;
+        BinaryExpr binary;
+        Literal literal;
         char *ref;
     };
 };
@@ -241,6 +256,21 @@ void symbol_table_dump(SymbolTable *table);
 extern SymbolTable *global_scope;
 void init_global_scope();
 
+/* optimize.c */
+void optimize(Node *program);
+
+/* ir.c */
+typedef struct BasicBlock BasicBlock;
+struct BasicBlock {
+    int id;
+    Node *first;
+    Node *last;
+    BasicBlock *next;
+};
+
+BasicBlock *construct_control_flow_graph(Node *root);
+void print_blocks(BasicBlock *block, const char *tag);
+
 /* codegen.c */
 typedef enum {
     TARGET_LINUX_NASM_X86_64,
@@ -251,20 +281,11 @@ const char *target_as_str(TargetKind kind);
 
 #define DEFAULT_TARGET_CODE_CAPACITY 2048
 
-typedef struct Register Register;
-struct Register {
-    char *name;
-    bool is_preserved;
-    bool is_open;
-    Register *next;
-};
-
 typedef struct {
     TargetKind kind;
     char *generated_code;
     size_t code_length;
     size_t code_capacity;
-    Register *registers;
 } TargetASM;
 
 void target_asm_init(TargetASM *out, TargetKind kind);
@@ -279,6 +300,7 @@ void error_at_token(Token *t, const char *fmt, ...);
 void error_with_context(char *loc, const char *fmt, ...);
 
 int str_to_int(const char *s, size_t length);
+char *rand_str(size_t length);
 
 /* main.c */
 typedef struct {

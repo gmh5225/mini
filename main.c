@@ -47,6 +47,7 @@ MiniOptions parse_mini_options(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     MiniOptions opts = parse_mini_options(argc, argv);
+    srand(time(NULL));
 
     FILE *file = fopen(opts.input_filename, "rb");
     if (!file) {
@@ -71,6 +72,8 @@ int main(int argc, char **argv) {
     if (opts.dump_flags & DUMP_AST) {
         dump_ast(program);
     }
+
+    optimize(program);
 
     printf("compiling to `%s`\n", opts.output_filename);
     TargetASM target;

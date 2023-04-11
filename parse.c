@@ -234,6 +234,19 @@ static Node *parse_variable_declaration(char *var_name) {
     return node;
 }
 
+static Node *parse_variable_assignment(char *var_name) {
+    consume(); // consume `=`
+
+    Node *node = make_node(NODE_ASSIGN_EXPR);
+    node->assign.name = var_name;
+    node->assign.value = parse_expression();
+    
+    // TODO: add typechecking to see if expression matches declared type for var
+
+    expect(TOKEN_SEMICOLON);
+    return node;
+}
+
 static Node *parse_function_call(char *func_name) {
     return NULL;
 }
@@ -321,9 +334,20 @@ static Node *parse_function_declaration() {
                 break;
             case TOKEN_IDENTIFIER:
                 char *identifier = consume()->str.data;
-                stmt = (tok()->kind == TOKEN_LPAREN) ?
-                    parse_function_call(identifier) :
-                    parse_variable_declaration(identifier);
+                switch (tok()->kind) {
+                    case TOKEN_LPAREN:
+                        stmt = parse_function_call(identifier);
+                        break;
+                    case TOKEN_WALRUS:
+                        stmt = parse_variable_declaration(identifier);
+                        break;
+                    case TOKEN_EQUAL:
+                        stmt = parse_variable_assignment(identifier);
+                        break;
+                    default:
+                        error_at_token(tok(), "invalid token `%s` while parsing function body",
+                                token_as_str(tok()->kind));
+                }
                 break;
             case TOKEN_RETURN:
                 consume();
@@ -417,7 +441,8 @@ static void dump_ast_impl(Node *root, int level) {
             printf("[FUNC_CALL]:");
             break;
         case NODE_ASSIGN_EXPR:
-            printf("[ASSIGN]:");
+            printf("[ASSIGN]: name = %s\n", root->assign.name);
+            dump_ast_impl(root->assign.value, level + 1);
             break;
         case NODE_UNARY_EXPR:
             printf("[UNARY]: op = %c\n", root->unary.un_op);

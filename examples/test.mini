@@ -25,10 +25,8 @@ func main() -> int {
  _start:
      ; Evaluate -1 + 2 * 3
      mov rax, 2
-     mov rbx, 3
-     imul rax, rbx
-     mov rcx, -1
-     add rax, rcx
+     imul rax, 3
+     add rax, -1
 
      ; Exit syscall
      mov rdi, rax

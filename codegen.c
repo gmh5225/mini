@@ -4,25 +4,81 @@
 
 // NASM x86_64 (Linux)
 
+typedef struct {
+    int id;
+    char *name;
+    bool is_preserved;
+    bool is_active;
+} Register;
+
 enum { R_RAX, R_RBX, R_RCX, R_RDX,
     R_RSP, R_RBP, R_RSI, R_RDI, 
     R_R8, R_R9, R_R10, R_R11, R_R12 };
 
+#define NUM_REGISTERS R_R12 + 1
+
+// TODO: Maybe put preserved registers at the bottom of this array
+// so that we prioritize assigning scratch registers first.
+// Using a preserved register requires an additional store to move it 
+// onto the stack and a load to restore it.
 static const Register registers_x86_64[] = {
-    [R_RAX] = { "rax", false, true, NULL },
-    [R_RBX] = { "rbx", true, false, NULL },
-    [R_RCX] = { "rcx", false, true, NULL },
-    [R_RDX] = { "rdx", false, true, NULL },
-    [R_RSP] = { "rsp", true, false, NULL },
-    [R_RBP] = { "rbp", true, false, NULL },
-    [R_RSI] = { "rsi", false, true, NULL },
-    [R_RDI] = { "rdi", false, true, NULL },
-    [R_R8]  = { "r8", false, true, NULL },
-    [R_R9]  = { "r9", false, true, NULL },
-    [R_R10] = { "r10", false, true, NULL },
-    [R_R11] = { "r11", false, true, NULL },
-    [R_R12] = { "r12", true, false, NULL },
+    [R_RAX] = { R_RAX, "rax", false, false },
+    [R_RBX] = { R_RBX, "rbx", true, false },
+    [R_RCX] = { R_RCX, "rcx", false, false },
+    [R_RDX] = { R_RDX, "rdx", false, false },
+    [R_RSP] = { R_RSP, "rsp", true, false },
+    [R_RBP] = { R_RBP, "rbp", true, false },
+    [R_RSI] = { R_RSI, "rsi", false, false },
+    [R_RDI] = { R_RDI, "rdi", false, false },
+    [R_R8]  = { R_R8, "r8", false, false },
+    [R_R9]  = { R_R9, "r9", false, false },
+    [R_R10] = { R_R10, "r10", false, false },
+    [R_R11] = { R_R11, "r11", false, false },
+    [R_R12] = { R_R12, "r12", true, false },
 };
+
+/* Simple Linear Scan Register Allocator */
+typedef struct {
+    Register registers[NUM_REGISTERS];
+    TargetASM *out;
+} CodegenCtx;
+
+static void codegen_ctx_init(CodegenCtx *ctx, TargetASM *out) {
+    ctx->out = out;
+#ifdef DEBUG
+    printf("Available Registers:\n");
+#endif
+    for (int id = R_RAX; id <= R_R12; id++) {
+        ctx->registers[id] = registers_x86_64[id];
+#ifdef DEBUG
+        printf("%*s%s\t%s\t%s\n", 4, "",
+                ctx->registers[id].name,
+                ctx->registers[id].is_preserved ? "preserved" : "scratch",
+                ctx->registers[id].is_active ? "active" : "");
+#endif
+    }
+}
+
+static void save_register_to_stack(CodegenCtx *ctx, int id) {
+    Register *reg = &ctx->registers[id];
+}
+
+static Register *find_available_register(CodegenCtx *ctx) {
+    for (int id = R_RAX; id <= R_R12; id++) {
+        Register *reg = &ctx->registers[id];
+        if (!reg->is_active) {
+            reg->is_active = true;
+
+            return reg;
+        }
+    }
+    return NULL;
+}
+
+static void release_register(CodegenCtx *ctx, int id) {
+    Register *reg = &ctx->registers[id];
+    reg->is_active = false;
+}
 
 // Directives to allocate memory (in # bytes)
 enum { DB = 1, DW = 2, DD = 4, DQ = 8,
@@ -55,10 +111,6 @@ static void write_bytes(TargetASM *out, const char *bytes, size_t length) {
     out->code_length += length;
 }
 
-static Register *next_register(TargetASM *out) {
-    return NULL;
-}
-
 static void add_section(TargetASM *out, char *section_name) {
     const char *section_text = "section ";
     write_bytes(out, section_text, strlen(section_text));
@@ -88,34 +140,37 @@ static void add_instruction(TargetASM *out, char *inst, char *op1, char *op2) {
     write_bytes(out, "\n", 1);
 }
 
-static void generate_function(TargetASM *out, FuncDecl *func) {
+static void generate_function(TargetASM *out, CodegenCtx *ctx, FuncDecl *func) {
     if (strcmp(func->name, "main") == 0) {
         add_label(out, "_start");
     } else {
         add_label(out, func->name);
     }
+
+    BasicBlock *func_body = construct_control_flow_graph(func->body);
+    print_blocks(func_body, func->name);
 }
 
-static void generate_variable(TargetASM *out, VarDecl *var) {
+static void generate_variable(TargetASM *out, CodegenCtx *ctx, VarDecl *var) {
     if (symbol_table_lookup(global_scope, var->name)) return;
     error("stack local variable initialization not yet supported!");
 }
 
-static void generate(TargetASM *out, Node *root) {
+static void generate(TargetASM *out, CodegenCtx *ctx, Node *root) {
     if (!root) return;
 
     switch (root->kind) {
         case NODE_FUNC_DECL:
-            generate_function(out, &root->func_decl);
+            generate_function(out, ctx, &root->func_decl);
             break;
         case NODE_VAR_DECL:
-            generate_variable(out, &root->var_decl);
+            generate_variable(out, ctx, &root->var_decl);
             break;
         default:
             error("cannot generate code for node type: %d", root->kind);
     }
 
-    generate(out, root->next);
+    generate(out, ctx, root->next);
 }
 
 void target_asm_init(TargetASM *out, TargetKind kind) {
@@ -123,39 +178,13 @@ void target_asm_init(TargetASM *out, TargetKind kind) {
     out->generated_code = calloc(DEFAULT_TARGET_CODE_CAPACITY, sizeof(char));
     out->code_length = 0;
     out->code_capacity = DEFAULT_TARGET_CODE_CAPACITY;
-
-    // Create register stack to keep track of what registers we can use, 
-    // placing the scratch registers at the top of the stack.
-    Register scratch = {0};
-    Register preserved = {0};
-    Register *cur = &scratch;
-    Register *save = &preserved;
-    for (int id = R_RAX; id <= R_R12; id++) {
-        Register *reg = malloc(sizeof(Register));
-        *reg = registers_x86_64[id];
-
-        if (reg->is_preserved) {
-            save = save->next = reg;
-        } else {
-            cur = cur->next = reg;
-        }
-    }
-    cur = cur->next = preserved.next;
-    out->registers = scratch.next;
-
-#ifdef DEBUG
-    printf("Open Registers:\n");
-    Register *iter = out->registers;
-    while (iter) {
-        printf("%*s%s\t%s\n", 4, "",
-                iter->name, iter->is_preserved ? "preserved" : "scratch");
-        iter = iter->next;
-    }
-#endif
 }
 
 // Generate code using `root` and the `global_scope` symbol table
 void target_asm_generate_code(TargetASM *out, Node *program) {
+    CodegenCtx ctx = {0};
+    codegen_ctx_init(&ctx, out);
+
     // Initialize global variables.
     // Since we do not have constant folding implemented yet,
     // we store all global variables in the bss section for now and compute their values
@@ -235,7 +264,6 @@ void target_asm_generate_code(TargetASM *out, Node *program) {
             //    }
             //}
         }
-
     }
 
     // Generate code for entry point of program
@@ -243,7 +271,7 @@ void target_asm_generate_code(TargetASM *out, Node *program) {
     add_instruction(out, "global", "_start", NULL);
 
     // Generate the program recursively
-    generate(out, program);
+    generate(out, &ctx, program);
 }
 
 void target_asm_write_to_file(TargetASM *out, char *output_filename) {
@@ -265,11 +293,4 @@ void target_asm_free(TargetASM *out) {
         out->generated_code = NULL;
     }
     out->code_length = out->code_capacity = 0;
-
-    Register *iter = out->registers;
-    while (iter) {
-        Register *temp = iter->next;
-        free(iter);
-        iter = temp;
-    }
 }
