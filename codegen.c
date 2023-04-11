@@ -9,7 +9,7 @@ typedef struct {
     char *name;
     bool is_preserved;
     bool is_active;
-} Register;
+} cpu_reg;
 
 enum { R_RAX, R_RBX, R_RCX, R_RDX,
     R_RSP, R_RBP, R_RSI, R_RDI, 
@@ -21,7 +21,7 @@ enum { R_RAX, R_RBX, R_RCX, R_RDX,
 // so that we prioritize assigning scratch registers first.
 // Using a preserved register requires an additional store to move it 
 // onto the stack and a load to restore it.
-static const Register registers_x86_64[] = {
+static const cpu_reg registers_x86_64[] = {
     [R_RAX] = { R_RAX, "rax", false, false },
     [R_RBX] = { R_RBX, "rbx", true, false },
     [R_RCX] = { R_RCX, "rcx", false, false },
@@ -37,16 +37,16 @@ static const Register registers_x86_64[] = {
     [R_R12] = { R_R12, "r12", true, false },
 };
 
-/* Simple Linear Scan Register Allocator */
+/* Simple Linear Scan cpu_reg Allocator */
 typedef struct {
-    Register registers[NUM_REGISTERS];
-    TargetASM *out;
-} CodegenCtx;
+    cpu_reg registers[NUM_REGISTERS];
+    target_asm *out;
+} codegen_ctx;
 
-static void codegen_ctx_init(CodegenCtx *ctx, TargetASM *out) {
+static void codegen_ctx_init(codegen_ctx *ctx, target_asm *out) {
     ctx->out = out;
 #ifdef DEBUG
-    printf("Available Registers:\n");
+    printf("Available cpu_regs:\n");
 #endif
     for (int id = R_RAX; id <= R_R12; id++) {
         ctx->registers[id] = registers_x86_64[id];
@@ -59,13 +59,13 @@ static void codegen_ctx_init(CodegenCtx *ctx, TargetASM *out) {
     }
 }
 
-static void save_register_to_stack(CodegenCtx *ctx, int id) {
-    Register *reg = &ctx->registers[id];
+static void save_register_to_stack(codegen_ctx *ctx, int id) {
+    cpu_reg *reg = &ctx->registers[id];
 }
 
-static Register *find_available_register(CodegenCtx *ctx) {
+static cpu_reg *find_available_register(codegen_ctx *ctx) {
     for (int id = R_RAX; id <= R_R12; id++) {
-        Register *reg = &ctx->registers[id];
+        cpu_reg *reg = &ctx->registers[id];
         if (!reg->is_active) {
             reg->is_active = true;
 
@@ -75,8 +75,8 @@ static Register *find_available_register(CodegenCtx *ctx) {
     return NULL;
 }
 
-static void release_register(CodegenCtx *ctx, int id) {
-    Register *reg = &ctx->registers[id];
+static void release_register(codegen_ctx *ctx, int id) {
+    cpu_reg *reg = &ctx->registers[id];
     reg->is_active = false;
 }
 
@@ -96,9 +96,9 @@ const char *bss_alloc_directive[] = {
 const char *target_strings[] = {
     [TARGET_LINUX_NASM_X86_64] = "linux_nasm_x86_64",
 };
-const char *target_as_str(TargetKind kind) { return target_strings[kind]; }
+const char *target_as_str(target_kind kind) { return target_strings[kind]; }
 
-static void write_bytes(TargetASM *out, const char *bytes, size_t length) {
+static void write_bytes(target_asm *out, const char *bytes, size_t length) {
     if (out->code_length + length >= out->code_capacity) {
         out->code_capacity <<= 1;
         void *tmp = realloc(out->generated_code, sizeof(char) * out->code_capacity);
@@ -111,19 +111,19 @@ static void write_bytes(TargetASM *out, const char *bytes, size_t length) {
     out->code_length += length;
 }
 
-static void add_section(TargetASM *out, char *section_name) {
+static void add_section(target_asm *out, char *section_name) {
     const char *section_text = "section ";
     write_bytes(out, section_text, strlen(section_text));
     write_bytes(out, section_name, strlen(section_name));
     write_bytes(out, "\n", 2);
 }
 
-static void add_label(TargetASM *out, char *label_name) {
+static void add_label(target_asm *out, char *label_name) {
     write_bytes(out, label_name, strlen(label_name));
     write_bytes(out, ":\n", 2);
 }
 
-static void add_instruction(TargetASM *out, char *inst, char *op1, char *op2) {
+static void add_instruction(target_asm *out, char *inst, char *op1, char *op2) {
     write_bytes(out, INDENT);
     write_bytes(out, inst, strlen(inst));
 
@@ -140,23 +140,23 @@ static void add_instruction(TargetASM *out, char *inst, char *op1, char *op2) {
     write_bytes(out, "\n", 1);
 }
 
-static void generate_function(TargetASM *out, CodegenCtx *ctx, FuncDecl *func) {
+static void generate_function(target_asm *out, codegen_ctx *ctx, func_decl *func) {
     if (strcmp(func->name, "main") == 0) {
         add_label(out, "_start");
     } else {
         add_label(out, func->name);
     }
 
-    BasicBlock *func_body = construct_control_flow_graph(func->body);
+    basic_block *func_body = construct_control_flow_graph(func->body);
     print_blocks(func_body, func->name);
 }
 
-static void generate_variable(TargetASM *out, CodegenCtx *ctx, VarDecl *var) {
+static void generate_variable(target_asm *out, codegen_ctx *ctx, var_decl *var) {
     if (symbol_table_lookup(global_scope, var->name)) return;
     error("stack local variable initialization not yet supported!");
 }
 
-static void generate(TargetASM *out, CodegenCtx *ctx, Node *root) {
+static void generate(target_asm *out, codegen_ctx *ctx, ast_node *root) {
     if (!root) return;
 
     switch (root->kind) {
@@ -173,7 +173,7 @@ static void generate(TargetASM *out, CodegenCtx *ctx, Node *root) {
     generate(out, ctx, root->next);
 }
 
-void target_asm_init(TargetASM *out, TargetKind kind) {
+void target_asm_init(target_asm *out, target_kind kind) {
     out->kind = kind;
     out->generated_code = calloc(DEFAULT_TARGET_CODE_CAPACITY, sizeof(char));
     out->code_length = 0;
@@ -181,8 +181,8 @@ void target_asm_init(TargetASM *out, TargetKind kind) {
 }
 
 // Generate code using `root` and the `global_scope` symbol table
-void target_asm_generate_code(TargetASM *out, Node *program) {
-    CodegenCtx ctx = {0};
+void target_asm_generate_code(target_asm *out, ast_node *program) {
+    codegen_ctx ctx = {0};
     codegen_ctx_init(&ctx, out);
 
     // Initialize global variables.
@@ -195,9 +195,9 @@ void target_asm_generate_code(TargetASM *out, Node *program) {
     // to the generated_code array.
     add_section(out, ".bss");
     for (size_t i = 0; i < SYMBOL_TABLE_SIZE; i++) {
-        Symbol *symbol = global_scope->symbols[i];
+        symbol *symbol = global_scope->symbols[i];
         if (symbol->name && symbol->kind == SYMBOL_VARIABLE) {
-            Type type = symbol->type;
+            type type = symbol->type;
             write_bytes(out, INDENT);
             write_bytes(out, symbol->name, strlen(symbol->name));
             write_bytes(out, ": ", 2);
@@ -274,7 +274,7 @@ void target_asm_generate_code(TargetASM *out, Node *program) {
     generate(out, &ctx, program);
 }
 
-void target_asm_write_to_file(TargetASM *out, char *output_filename) {
+void target_asm_write_to_file(target_asm *out, char *output_filename) {
     FILE *f = fopen(output_filename, "w");
     if (!f) {
         error("couldn't open output file `%s` for writing");
@@ -287,7 +287,7 @@ void target_asm_write_to_file(TargetASM *out, char *output_filename) {
     fclose(f);
 }
 
-void target_asm_free(TargetASM *out) {
+void target_asm_free(target_asm *out) {
     if (out->generated_code) {
         free(out->generated_code);
         out->generated_code = NULL;

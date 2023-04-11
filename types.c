@@ -1,6 +1,6 @@
 #include "mini.h"
 
-const Type primitive_types[] = {
+const type primitive_types[] = {
     [TYPE_VOID] = {
         .kind = TYPE_VOID,
         .name = "void",

@@ -31,7 +31,7 @@ typedef enum {
     TOKEN_ELSE,
     TOKEN_TRUE,
     TOKEN_FALSE,
-    TOKEN_INT, // Primitive Types
+    TOKEN_INT, // Primitive types
     TOKEN_BOOL,
     TOKEN_WALRUS, // Operators
     TOKEN_EQUAL,
@@ -40,7 +40,7 @@ typedef enum {
     TOKEN_MINUS,
     TOKEN_STAR,
     TOKEN_SLASH,
-    TOKEN_LBRACE, // Symbols
+    TOKEN_LBRACE, // symbols
     TOKEN_RBRACE,
     TOKEN_LPAREN,
     TOKEN_RPAREN,
@@ -53,19 +53,19 @@ typedef enum {
     TOKEN_ARROW,
     TOKEN_IDENTIFIER, // User-defined
     TOKEN_NUMBER,
-} TokenKind;
+} token_kind;
 
 extern const char *token_strings[];
-const char *token_as_str(TokenKind kind);
+const char *token_as_str(token_kind kind);
 
 #define IDENTIFIER_MAX_LEN  256
 #define NUMBER_MAX_LEN      256
 #define STRING_MAX_LEN      4096
 
 
-typedef struct Token Token;
-struct Token {
-    TokenKind kind;
+typedef struct token token;
+struct token {
+    token_kind kind;
     int line, col;
     union {
         intmax_t i_val;
@@ -82,28 +82,28 @@ struct Token {
 };
 
 typedef struct {
-    Token *tokens;
+    token *tokens;
     size_t pos;
     size_t size;
     size_t capacity;
-} TokenStream;
+} token_stream;
 
-TokenStream token_stream_create();
-void token_stream_append(TokenStream *stream, Token token);
-Token *token_stream_get(TokenStream *stream);
-Token *token_stream_next(TokenStream *stream);
-Token *token_stream_prev(TokenStream *stream);
+token_stream token_stream_create();
+void token_stream_append(token_stream *stream, token token);
+token *token_stream_get(token_stream *stream);
+token *token_stream_next(token_stream *stream);
+token *token_stream_prev(token_stream *stream);
 
-TokenStream lex(FILE *file);
+token_stream lex(FILE *file);
 
 /* types.c */
-typedef struct TypeMember TypeMember;
-typedef struct Type Type;
+typedef struct type_member type_member;
+typedef struct type type;
 
-struct TypeMember {
-    TypeMember *next;
+struct type_member {
+    type_member *next;
     char *name;
-    Type *type;
+    type *type;
     int align;
     int size;
     int offset;
@@ -111,7 +111,7 @@ struct TypeMember {
 
 typedef enum {
     TYPE_UNKNOWN,
-    TYPE_VOID, // Primitive Types
+    TYPE_VOID, // Primitive types
     TYPE_INT,
     TYPE_UINT,
     TYPE_FLOAT,
@@ -120,56 +120,56 @@ typedef enum {
     TYPE_BOOL,
     TYPE_STRUCT, // User-defined
     TYPE_ENUM,
-} TypeKind;
+} type_kind;
 
-struct Type {
-    TypeKind kind;
+struct type {
+    type_kind kind;
     char *name;
     int align;
     int size;
     bool is_pointer;
     union {
-        TypeMember *members;
+        type_member *members;
     };
 };
 
-extern const Type primitive_types[];
+extern const type primitive_types[];
 
 /* parse.c */
-typedef struct Node Node;
+typedef struct ast_node ast_node;
 
 typedef struct {
     char *name;
-    Type return_type;
-    Node *params; 
-    Node *body;
-} FuncDecl;
+    type return_type;
+    ast_node *params; 
+    ast_node *body;
+} func_decl;
 
 typedef struct {
     char *name;
-    Type type;
-    Node *init;
-} VarDecl;
+    type type;
+    ast_node *init;
+} var_decl;
 
 typedef struct {
     char *name;
-    Node *value;
-} AssignExpr;
+    ast_node *value;
+} assign_expr;
 
 typedef struct {
-    Node *value;
-} RetStmt;
+    ast_node *value;
+} ret_stmt;
 
 typedef struct {
     char un_op;
-    Node *expr;
-} UnaryExpr;
+    ast_node *expr;
+} unary_expr;
 
 typedef struct {
     char bin_op;
-    Node *lhs;
-    Node *rhs;
-} BinaryExpr;
+    ast_node *lhs;
+    ast_node *rhs;
+} binary_expr;
 
 typedef union {
     intmax_t i_val;
@@ -178,7 +178,7 @@ typedef union {
     double d_val;
     char c_val;
     bool b_val;
-} Literal;
+} literal;
 
 typedef enum {
     NODE_UNKNOWN,
@@ -192,26 +192,26 @@ typedef enum {
     NODE_BINARY_EXPR,
     NODE_LITERAL_EXPR,
     NODE_REF_EXPR,
-} NodeKind;
+} node_kind;
 
-struct Node {
-    NodeKind kind;
-    Node *next;
-    Type type;
+struct ast_node {
+    node_kind kind;
+    ast_node *next;
+    type type;
     union {
-        FuncDecl func_decl;
-        VarDecl var_decl;
-        RetStmt ret_stmt;
-        AssignExpr assign;
-        UnaryExpr unary;
-        BinaryExpr binary;
-        Literal literal;
+        func_decl func_decl;
+        var_decl var_decl;
+        ret_stmt ret_stmt;
+        assign_expr assign;
+        unary_expr unary;
+        binary_expr binary;
+        literal literal;
         char *ref;
     };
 };
 
-Node *parse(TokenStream *stream);
-void dump_ast(Node *program);
+ast_node *parse(token_stream *stream);
+void dump_ast(ast_node *program);
 
 /* symbols.c */
 typedef enum {
@@ -219,16 +219,16 @@ typedef enum {
     SYMBOL_VARIABLE,
     SYMBOL_FUNCTION,
     SYMBOL_TYPE,
-} SymbolKind;
+} symbol_kind;
 
 extern const char *symbol_strings[];
-const char *symbol_as_str(SymbolKind kind);
+const char *symbol_as_str(symbol_kind kind);
 
-typedef struct Symbol Symbol;
-struct Symbol {
-    SymbolKind kind;
-    Symbol *next;
-    Type type;
+typedef struct symbol symbol;
+struct symbol {
+    symbol_kind kind;
+    symbol *next;
+    type type;
     char *name;
     int align;
     int offset;
@@ -238,65 +238,65 @@ struct Symbol {
 
 #define SYMBOL_TABLE_SIZE 256
 
-typedef struct SymbolTable SymbolTable;
-struct SymbolTable {
+typedef struct symbol_table symbol_table;
+struct symbol_table {
     char *name;
-    Symbol *symbols[SYMBOL_TABLE_SIZE];
-    SymbolTable *parent;
-    SymbolTable *child;
-    SymbolTable *next;
+    symbol *symbols[SYMBOL_TABLE_SIZE];
+    symbol_table *parent;
+    symbol_table *child;
+    symbol_table *next;
 };
 
-SymbolTable *symbol_table_create(char *table_name);
-Symbol *symbol_table_insert(SymbolTable *table, char *symbol_name, SymbolKind kind);
-Symbol *symbol_table_lookup(SymbolTable *table, char *symbol_name);
-void symbol_table_add_child(SymbolTable *parent, SymbolTable *child);
-void symbol_table_dump(SymbolTable *table);
+symbol_table *symbol_table_create(char *table_name);
+symbol *symbol_table_insert(symbol_table *table, char *symbol_name, symbol_kind kind);
+symbol *symbol_table_lookup(symbol_table *table, char *symbol_name);
+void symbol_table_add_child(symbol_table *parent, symbol_table *child);
+void symbol_table_dump(symbol_table *table);
 
-extern SymbolTable *global_scope;
+extern symbol_table *global_scope;
 void init_global_scope();
 
 /* optimize.c */
-void optimize(Node *program);
+void optimize(ast_node *program);
 
 /* ir.c */
-typedef struct BasicBlock BasicBlock;
-struct BasicBlock {
+typedef struct basic_block basic_block;
+struct basic_block {
     int id;
-    Node *first;
-    Node *last;
-    BasicBlock *next;
+    ast_node *first;
+    ast_node *last;
+    basic_block *next;
 };
 
-BasicBlock *construct_control_flow_graph(Node *root);
-void print_blocks(BasicBlock *block, const char *tag);
+basic_block *construct_control_flow_graph(ast_node *root);
+void print_blocks(basic_block *block, const char *tag);
 
 /* codegen.c */
 typedef enum {
     TARGET_LINUX_NASM_X86_64,
-} TargetKind;
+} target_kind;
 
 extern const char *target_strings[];
-const char *target_as_str(TargetKind kind);
+const char *target_as_str(target_kind kind);
 
 #define DEFAULT_TARGET_CODE_CAPACITY 2048
 
 typedef struct {
-    TargetKind kind;
+    target_kind kind;
     char *generated_code;
     size_t code_length;
     size_t code_capacity;
-} TargetASM;
+} target_asm;
 
-void target_asm_init(TargetASM *out, TargetKind kind);
-void target_asm_generate_code(TargetASM *out, Node *program);
-void target_asm_write_to_file(TargetASM *out, char *output_filename);
-void target_asm_free(TargetASM *out);
+void target_asm_init(target_asm *out, target_kind kind);
+void target_asm_generate_code(target_asm *out, ast_node *program);
+void target_asm_write_to_file(target_asm *out, char *output_filename);
+void target_asm_free(target_asm *out);
 
 /* util.c */
 void error(const char *fmt, ...);
 void error_at(int line, int col, const char *fmt, ...);
-void error_at_token(Token *t, const char *fmt, ...);
+void error_at_token(token *t, const char *fmt, ...);
 void error_with_context(char *loc, const char *fmt, ...);
 
 int str_to_int(const char *s, size_t length);
@@ -307,6 +307,6 @@ typedef struct {
     int dump_flags;
     char *input_filename;
     char *output_filename;
-} MiniOptions;
+} mini_opts;
 
 #endif

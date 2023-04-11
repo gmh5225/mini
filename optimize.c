@@ -2,17 +2,17 @@
 
 // TODO: Implement Dead-code elimination, Constant folding
 
-typedef void (*OptimizeFunc)(Node *);
+typedef void (*optimize_fn)(ast_node *);
 
 typedef struct {
-    NodeKind on;
-    OptimizeFunc fn;
-} Optimizer;
+    node_kind on;
+    optimize_fn fn;
+} optimizer;
 
-void fold_constants(Node *root) {
+void fold_constants(ast_node *root) {
 }
 
-static Optimizer optimizers[] = {
+static optimizer optimizers[] = {
     { NODE_BINARY_EXPR, fold_constants },
 };
 
@@ -20,7 +20,7 @@ typedef struct ssa_item ssa_item;
 struct ssa_item {
     char *name;
     int sub;
-    Node *value;
+    ast_node *value;
     ssa_item *next;
 };
 
@@ -34,8 +34,8 @@ void ssa_context_init(ssa_context *ctx) {
     ctx->items = NULL;
 }
 
-void ssa_context_add_item(ssa_context *ctx, char *name, Node *value) {
-    ssa_item *item = calloc(1, sizeof(ssa_item));
+void ssa_context_add_item(ssa_context *ctx, char *name, ast_node *value) {
+    ssa_item *item = calloc(1, sizeof(struct ssa_item));
     item->sub = 0;
     item->name = name;
     item->value = value;
@@ -66,22 +66,7 @@ void ssa_context_add_item(ssa_context *ctx, char *name, Node *value) {
     }
 }
 
-//void ssa_context_update_item(ssa_context *ctx, char *name, Node *value) {
-//  ssa_item *iter = ctx->items;
-//    for (;;) {
-//        if (!iter->next) break;
-//
-//        size_t len = strlen(name);
-//        if ((strlen(iter->name) == len) &&
-//            memcmp(iter->name, name, len) == 0) {
-//            iter->value = value;
-//            return;
-//        }
-//        iter = iter->next;
-//    }
-//}
-
-void translate_to_ssa(ssa_context *ctx, Node *root) {
+void translate_to_ssa(ssa_context *ctx, ast_node *root) {
     if (!root) return;
 
     switch (root->kind) {
@@ -116,7 +101,7 @@ void translate_to_ssa(ssa_context *ctx, Node *root) {
     translate_to_ssa(ctx, root->next);
 }
 
-void optimize(Node *program) {
+void optimize(ast_node *program) {
     // Translate to SSA form
     ssa_context ctx = {0};
     translate_to_ssa(&ctx, program);

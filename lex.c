@@ -41,37 +41,37 @@ const char *token_strings[] = {
     [TOKEN_IDENTIFIER] = "[IDENTIFIER]",
     [TOKEN_NUMBER] = "[NUMBER]",
 };
-const char *token_as_str(TokenKind kind) { return token_strings[kind]; }
+const char *token_as_str(token_kind kind) { return token_strings[kind]; }
 
-TokenStream token_stream_create() {
-    TokenStream stream = {0};
+token_stream token_stream_create() {
+    token_stream stream = {0};
     stream.pos = 0;
     stream.size = 0;
     stream.capacity = TOKEN_STREAM_CAPACITY;
-    stream.tokens = calloc(TOKEN_STREAM_CAPACITY, sizeof(Token));
+    stream.tokens = calloc(TOKEN_STREAM_CAPACITY, sizeof(struct token));
     return stream;
 }
 
-void token_stream_append(TokenStream *stream, Token token) {
+void token_stream_append(token_stream *stream, token token) {
     if (stream->size == stream->capacity) {
         stream->capacity <<= 1;
-        void *tmp = realloc(stream->tokens, sizeof(Token) * stream->capacity);
+        void *tmp = realloc(stream->tokens, sizeof(token) * stream->capacity);
         stream->tokens = tmp;
     }
     stream->tokens[stream->size++] = token;
 }
 
-Token *token_stream_get(TokenStream *stream) {
+token *token_stream_get(token_stream *stream) {
     if (stream->pos >= stream->size) return NULL;
     return &stream->tokens[stream->pos];
 }
 
-Token *token_stream_next(TokenStream *stream) {
+token *token_stream_next(token_stream *stream) {
     if (stream->pos >= stream->size) return NULL;
     return &stream->tokens[stream->pos++];
 }
 
-Token *token_stream_prev(TokenStream *stream) {
+token *token_stream_prev(token_stream *stream) {
     return NULL;
 }
 
@@ -131,8 +131,8 @@ static bool match(char expected) {
     return matches;
 }
 
-static Token make_token(TokenKind kind) {
-    Token token = {0};
+static token make_token(token_kind kind) {
+    token token = {0};
     token.kind = kind;
     token.line = line;
     token.col = col;
@@ -144,8 +144,8 @@ static bool is_alphabetic(char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' &
 static bool is_numeric(char c) { return c >= '0' && c <= '9'; }
 static bool is_alphanumeric(char c) { return is_alphabetic(c) || is_numeric(c); }
 
-static Token lex_alphabetic() {
-    Token token = make_token(TOKEN_IDENTIFIER);
+static token lex_alphabetic() {
+    token token = make_token(TOKEN_IDENTIFIER);
     char buf[IDENTIFIER_MAX_LEN] = {0};
     size_t len = 0;
     while (!reached(END_OF_FILE)) {
@@ -162,7 +162,7 @@ static Token lex_alphabetic() {
     buf[len] = 0;
 
     // Check if token is a keyword
-    for (TokenKind kind = TOKEN_CONST; kind <= TOKEN_ELSE; kind++) {
+    for (token_kind kind = TOKEN_CONST; kind <= TOKEN_ELSE; kind++) {
         if (memcmp(buf, token_as_str(kind), len) == 0) {
             token.kind = kind;
             return token;
@@ -182,7 +182,7 @@ static Token lex_alphabetic() {
         return token;
     }
 
-    // Token must be an identifier
+    // token must be an identifier
     token.str.data = calloc(len + 1, sizeof(char));
     token.str.length = len;
     memcpy(token.str.data, buf, len);
@@ -192,8 +192,8 @@ static Token lex_alphabetic() {
 }
 
 // TODO: add support for binary/octal/hexadecimal numbers + floating point numbers
-static Token lex_numeric() {
-    Token token = make_token(TOKEN_NUMBER);
+static token lex_numeric() {
+    token token = make_token(TOKEN_NUMBER);
     char buf[NUMBER_MAX_LEN] = {0};
     size_t len = 0;
     while (!reached(END_OF_FILE)) {
@@ -209,13 +209,13 @@ static Token lex_numeric() {
     }
     buf[len] = 0;
 
-    // Token must be an identifier
+    // token must be an identifier
     token.kind = TOKEN_NUMBER;
     token.i_val = str_to_int(buf, len);
     return token;
 }
 
-TokenStream lex(FILE *file) {
+token_stream lex(FILE *file) {
     // Initialize Lexer State
     current_file = file;
     line = col = 1;
@@ -223,8 +223,8 @@ TokenStream lex(FILE *file) {
     memset(buf, 0, sizeof(char) * LEX_BUF_SZ);
     fill_buffer();
 
-    // Tokenize
-    TokenStream stream = token_stream_create();
+    // tokenize
+    token_stream stream = token_stream_create();
     while (!reached(END_OF_FILE)) {
         char c = peek();
 
@@ -271,7 +271,7 @@ TokenStream lex(FILE *file) {
 
         int sym_line = line;
         int sym_col = col;
-        Token sym;
+        token sym;
         switch (next()) {
             case '+': sym = make_token(TOKEN_PLUS); break;
             case '-': sym = make_token(match('>') ? TOKEN_ARROW : TOKEN_MINUS); break;

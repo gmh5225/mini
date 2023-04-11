@@ -3,8 +3,8 @@
 
 enum { DUMP_TOKENS = 1, DUMP_AST };
 
-MiniOptions parse_mini_options(int argc, char **argv) {
-    MiniOptions opts = {
+mini_opts parse_mini_options(int argc, char **argv) {
+    mini_opts opts = {
         .dump_flags = 0,
         .input_filename = NULL,
         .output_filename = "a.out",
@@ -46,7 +46,7 @@ MiniOptions parse_mini_options(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-    MiniOptions opts = parse_mini_options(argc, argv);
+    mini_opts opts = parse_mini_options(argc, argv);
     srand(time(NULL));
 
     FILE *file = fopen(opts.input_filename, "rb");
@@ -55,19 +55,19 @@ int main(int argc, char **argv) {
     }
 
     init_global_scope();
-    TokenStream stream = lex(file);
+    token_stream stream = lex(file);
     fclose(file);
 
     if (opts.dump_flags & DUMP_TOKENS) {
         for (;;) {
-            Token *t = token_stream_next(&stream);
+            token *t = token_stream_next(&stream);
             if (t->kind == TOKEN_EOF) break;
             printf("%s\n", token_as_str(t->kind));
         }
         stream.pos = 0; // reset stream pos after printing tokens
     }
 
-    Node *program = parse(&stream);
+    ast_node *program = parse(&stream);
 
     if (opts.dump_flags & DUMP_AST) {
         dump_ast(program);
@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
     optimize(program);
 
     printf("compiling to `%s`\n", opts.output_filename);
-    TargetASM target;
+    target_asm target;
     target_asm_init(&target, TARGET_LINUX_NASM_X86_64);
     target_asm_generate_code(&target, program);
 
