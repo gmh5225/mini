@@ -1,10 +1,25 @@
-/* mini compiler */
-#include "mini.h"
+#include "lex.h"
+#include "parse.h"
+#include "symbols.h"
+#include "compile.h"
+#include "util.h"
+
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 enum { DUMP_TOKENS = 1, DUMP_AST };
 
-mini_opts parse_mini_options(int argc, char **argv) {
-    mini_opts opts = {
+typedef struct {
+    int dump_flags;
+    char *input_filename;
+    char *output_filename;
+} MiniOpts;
+
+MiniOpts parse_mini_options(int argc, char **argv) {
+    MiniOpts opts = {
         .dump_flags = 0,
         .input_filename = NULL,
         .output_filename = "a.out",
@@ -46,7 +61,7 @@ mini_opts parse_mini_options(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-    mini_opts opts = parse_mini_options(argc, argv);
+    MiniOpts opts = parse_mini_options(argc, argv);
     srand(time(NULL));
 
     FILE *file = fopen(opts.input_filename, "rb");
@@ -55,33 +70,25 @@ int main(int argc, char **argv) {
     }
 
     init_global_scope();
-    token_stream stream = lex(file);
+
+    TokenStream stream = lex(file);
     fclose(file);
 
     if (opts.dump_flags & DUMP_TOKENS) {
         for (;;) {
-            token *t = token_stream_next(&stream);
+            Token *t = token_stream_next(&stream);
             if (t->kind == TOKEN_EOF) break;
             printf("%s\n", token_as_str(t->kind));
         }
         stream.pos = 0; // reset stream pos after printing tokens
     }
 
-    ast_node *program = parse(&stream);
+    ASTNode *program = parse(&stream);
 
     if (opts.dump_flags & DUMP_AST) {
         dump_ast(program);
     }
 
-    optimize(program);
-
     printf("compiling to `%s`\n", opts.output_filename);
-    target_asm target;
-    target_asm_init(&target, TARGET_LINUX_NASM_X86_64);
-    target_asm_generate_code(&target, program);
-
-    target_asm_write_to_file(&target, opts.output_filename);
-    target_asm_free(&target);
-
-    return 0;
+    return compile(program);
 }

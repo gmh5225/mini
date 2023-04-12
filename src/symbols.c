@@ -1,6 +1,13 @@
-#include "mini.h"
+#include "symbols.h"
+#include "types.h"
 
-symbol_table *global_scope = NULL;
+#include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+SymbolTable *global_scope = NULL;
 
 const char *symbol_strings[] = {
     [SYMBOL_UNKNOWN] = "[UNKNOWN SYMBOL]",
@@ -8,7 +15,7 @@ const char *symbol_strings[] = {
     [SYMBOL_FUNCTION] = "[FUNCTION]",
 };
 
-const char *symbol_as_str(symbol_kind type) {
+const char *symbol_as_str(SymbolKind type) {
     return symbol_strings[type];
 }
 
@@ -16,9 +23,9 @@ void init_global_scope() {
     global_scope = symbol_table_create("__GLOBAL__");
 
     // Add supported primitive types to global scope
-    for (type_kind kind = TYPE_VOID; kind <= TYPE_BOOL; kind++) {
-        type primitive = primitive_types[kind];
-        symbol *p_type_sym = symbol_table_insert(global_scope, primitive.name, SYMBOL_TYPE);
+    for (TypeKind kind = TYPE_VOID; kind <= TYPE_BOOL; kind++) {
+        Type primitive = primitive_types[kind];
+        Symbol *p_type_sym = symbol_table_insert(global_scope, primitive.name, SYMBOL_TYPE);
         p_type_sym->type = primitive;
     }
 }
@@ -32,11 +39,11 @@ uint64_t hash(char *s) {
     return hash;
 }
 
-static symbol *symbol_info_create(void) {
-    symbol *s = malloc(sizeof(struct symbol));
+static Symbol *symbol_info_create(void) {
+    Symbol *s = malloc(sizeof(Symbol));
     s->kind = SYMBOL_UNKNOWN;
     s->next = NULL;
-    s->type = (type){.kind = TYPE_UNKNOWN};
+    s->type = (Type){.kind = TYPE_UNKNOWN};
     s->name = NULL;
     s->align = -1;
     s->offset = -1;
@@ -45,9 +52,9 @@ static symbol *symbol_info_create(void) {
     return s;
 }
 
-symbol_table *symbol_table_create(char *name) {
+SymbolTable *symbol_table_create(char *name) {
     size_t length = strlen(name);
-    symbol_table *table = malloc(sizeof(struct symbol_table));
+    SymbolTable *table = malloc(sizeof(SymbolTable));
     table->name = malloc(sizeof(char) * (length + 1));
     memcpy(table->name, name, length);
     table->name[length] = 0;
@@ -64,24 +71,24 @@ symbol_table *symbol_table_create(char *name) {
     return table;
 }
 
-symbol *symbol_table_insert(symbol_table *table, char *symbol_name, symbol_kind kind) {
+Symbol *symbol_table_insert(SymbolTable *table, char *symbol_name, SymbolKind kind) {
     if (!table) return NULL;
 
-    // Check if the symbol already exists in one of the current table or parent tables.
-    // If the symbol is a function, ignore this check as we will still add it to its own
+    // Check if the Symbol already exists in one of the current table or parent tables.
+    // If the Symbol is a function, ignore this check as we will still add it to its own
     // scope to allow for recursion.
-    symbol *exists = NULL;
+    Symbol *exists = NULL;
     if ((exists = symbol_table_lookup(table, symbol_name))) {
         return NULL;
     }
 
     uint64_t index = hash(symbol_name) % SYMBOL_TABLE_SIZE;
-    symbol *info = table->symbols[index];
+    Symbol *info = table->symbols[index];
 
-    // If a symbol_info already exists at index AND is contains valid symbol information,
+    // If a symbol_info already exists at index AND is contains valid Symbol information,
     // deal with the hash collision by appending to the linked list
     if (info && info->name) {
-        symbol *new_info = symbol_info_create();
+        Symbol *new_info = symbol_info_create();
         new_info->name = symbol_name;
         new_info->kind = kind;
         new_info->next = info;
@@ -95,11 +102,11 @@ symbol *symbol_table_insert(symbol_table *table, char *symbol_name, symbol_kind 
     return info;
 }
 
-symbol *symbol_table_lookup(symbol_table *table, char *symbol_name) {
+Symbol *symbol_table_lookup(SymbolTable *table, char *symbol_name) {
     if (!table) return NULL;
 
     uint64_t index = hash(symbol_name) % SYMBOL_TABLE_SIZE;
-    symbol *info = table->symbols[index];
+    Symbol *info = table->symbols[index];
 
     while (info && info->name) {
         if (memcmp(info->name, symbol_name, strlen(symbol_name)) == 0) {
@@ -108,7 +115,7 @@ symbol *symbol_table_lookup(symbol_table *table, char *symbol_name) {
         info = info->next;
     }
 
-    // If we couldn't find the symbol in the current scope, do lookup in the parent
+    // If we couldn't find the Symbol in the current scope, do lookup in the parent
     if (table->parent) {
         return symbol_table_lookup(table->parent, symbol_name);
     }
@@ -116,19 +123,19 @@ symbol *symbol_table_lookup(symbol_table *table, char *symbol_name) {
     return NULL;
 }
 
-void symbol_table_add_child(symbol_table *parent, symbol_table *child) {
+void symbol_table_add_child(SymbolTable *parent, SymbolTable *child) {
     parent->child = child;
     child->parent = parent;
 }
 
-void symbol_table_dump_impl(symbol_table *table, int level) {
+void symbol_table_dump_impl(SymbolTable *table, int level) {
     for (int i = 0; i < level; i++) {
         printf("    ");
     }
 
     printf("Scope: %s\n", table->name);
     for (size_t i = 0; i < SYMBOL_TABLE_SIZE; i++) {
-        symbol *info = table->symbols[i];
+        Symbol *info = table->symbols[i];
         while (info && info->name) {
             for (int i = 0; i < level; i++) {
                 printf("    ");
@@ -149,6 +156,6 @@ void symbol_table_dump_impl(symbol_table *table, int level) {
     }
 }
 
-void symbol_table_dump(symbol_table *table) {
+void symbol_table_dump(SymbolTable *table) {
     symbol_table_dump_impl(table, 0);
 }

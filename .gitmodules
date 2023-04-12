@@ -1,0 +1,3 @@
+[submodule "minigen"]
+	path = minigen
+	url = https://github.com/sigrvn/minigen

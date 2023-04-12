@@ -1,10 +1,15 @@
-#include "mini.h"
+#include "parse.h"
+#include "symbols.h"
+#include "util.h"
 
-static symbol_table *current_scope;  // The current scope of the parser
-static token_stream *tokens;         // The stream of tokens to parse
-static ast_node *stack_top;             // The top of the expression stack
+#include <stdio.h>
+#include <stdlib.h>
 
-void enter_scope(symbol_table *new_scope) {
+static SymbolTable *current_scope;  // The current scope of the parser
+static TokenStream *tokens;         // The stream of tokens to parse
+static ASTNode *stack_top;          // The top of the expression stack
+
+void enter_scope(SymbolTable *new_scope) {
     current_scope = new_scope;
 }
 
@@ -12,22 +17,22 @@ void exit_scope() {
     current_scope = current_scope->parent;
 }
 
-static token *tok() {
+static Token *tok() {
     return token_stream_get(tokens);
 }
 
-static token *consume() {
+static Token *consume() {
     return token_stream_next(tokens);
 }
 
-static token *match(token_kind want) {
+static Token *match(TokenKind want) {
     bool matches = tok()->kind == want;
     if (matches) return consume();
     return NULL;
 }
 
-static token *expect(token_kind expected) {
-    token *curr = consume();
+static Token *expect(TokenKind expected) {
+    Token *curr = consume();
     if (curr->kind != expected) {
         error_at_token(curr, "expected `%s`, got `%s`",
                 token_as_str(expected), token_as_str(curr->kind));
@@ -35,24 +40,24 @@ static token *expect(token_kind expected) {
     return curr;
 }
 
-static ast_node *make_node(node_kind kind) {
-    ast_node *node = calloc(1, sizeof(struct ast_node));
+static ASTNode *make_node(NodeKind kind) {
+    ASTNode *node = calloc(1, sizeof(struct ASTNode));
     node->kind = kind;
     return node;
 }
 
-void push_expr_node(ast_node *expr) {
+void push_expr_node(ASTNode *expr) {
     if (!stack_top) {
         stack_top = expr;
     } else {
-        ast_node *temp = stack_top;
+        ASTNode *temp = stack_top;
         stack_top = expr;
         stack_top->next = temp;
     }
 }
 
-ast_node *pop_expr_node() {
-    ast_node *ret = stack_top;
+ASTNode *pop_expr_node() {
+    ASTNode *ret = stack_top;
     stack_top = stack_top->next;
     // Propagate inner-most expression type to outer expressions
     if (stack_top) {
@@ -64,15 +69,15 @@ ast_node *pop_expr_node() {
 static void parse_factor();
 static void parse_term();
 
-static ast_node *parse_unary_expr(char un_op) {
-    ast_node *node = make_node(NODE_UNARY_EXPR);
+static ASTNode *parse_unary_expr(char un_op) {
+    ASTNode *node = make_node(NODE_UNARY_EXPR);
     node->unary.un_op = un_op;
     node->unary.expr = pop_expr_node();
     return node;
 }
 
-static ast_node *parse_binary_expr(char bin_op) {
-    ast_node *node = make_node(NODE_BINARY_EXPR);
+static ASTNode *parse_binary_expr(char bin_op) {
+    ASTNode *node = make_node(NODE_BINARY_EXPR);
     node->binary.bin_op = bin_op;
 
     node->binary.lhs = pop_expr_node();
@@ -90,15 +95,15 @@ static ast_node *parse_binary_expr(char bin_op) {
 }
 
 static void parse_factor() {
-    ast_node *node = make_node(NODE_LITERAL_EXPR);
+    ASTNode *node = make_node(NODE_LITERAL_EXPR);
 
     switch (tok()->kind) {
         case TOKEN_IDENTIFIER:
             // Check to see if the variable we are referencing is valid
             char *var_name = consume()->str.data;
-            symbol *var_sym = symbol_table_lookup(current_scope, var_name);
+            Symbol *var_sym = symbol_table_lookup(current_scope, var_name);
             if (!var_sym) {
-                error_at_token(tok(), "unknown symbol `%s`", var_name);
+                error_at_token(tok(), "unknown Symbol `%s`", var_name);
             }
             node->kind = NODE_REF_EXPR;
             node->type = var_sym->type;
@@ -116,7 +121,7 @@ static void parse_factor() {
             node->literal.b_val = consume()->b_val;
             break;
         default:
-            error_at_token(tok(), "invalid token `%s` while parsing expression",
+            error_at_token(tok(), "invalid Token `%s` while parsing expression",
                     token_as_str(tok()->kind));
     }
 
@@ -142,7 +147,7 @@ void parse_term() {
     }
 }
 
-static ast_node *parse_expression() {
+static ASTNode *parse_expression() {
     char un_op = 0;
     switch (tok()->kind) {
         case TOKEN_MINUS: 
@@ -182,18 +187,18 @@ static ast_node *parse_expression() {
     return pop_expr_node();
 }
 
-static type parse_type() {
+static Type parse_type() {
     char *type_name = expect(TOKEN_IDENTIFIER)->str.data;
 
-    // Search for type symbol in current scope
-    symbol *type_sym = symbol_table_lookup(current_scope, type_name);
+    // Search for type Symbol in current scope
+    Symbol *type_sym = symbol_table_lookup(current_scope, type_name);
     if (!type_sym) {
         error_at_token(tok(), "unknown type `%s`", type_name);
     }
     return type_sym->type;
 }
 
-static ast_node *parse_variable_declaration(char *var_name) {
+static ASTNode *parse_variable_declaration(char *var_name) {
     // Check if the variable is a constant and parse identifier if not yet parsed
     bool is_constant = false;
     if (!var_name) {
@@ -202,12 +207,12 @@ static ast_node *parse_variable_declaration(char *var_name) {
         var_name = expect(TOKEN_IDENTIFIER)->str.data;
     }
 
-    ast_node *node = make_node(NODE_VAR_DECL);
+    ASTNode *node = make_node(NODE_VAR_DECL);
     node->var_decl.name = var_name;
     node->var_decl.type = primitive_types[TYPE_VOID];
 
     // Insert variable into current scope
-    symbol *var_sym = symbol_table_insert(current_scope, var_name, SYMBOL_VARIABLE);
+    Symbol *var_sym = symbol_table_insert(current_scope, var_name, SYMBOL_VARIABLE);
     if (!var_sym) {
         error_at_token(tok(), "variable `%s` redeclared in scope", var_name);
     }
@@ -234,10 +239,10 @@ static ast_node *parse_variable_declaration(char *var_name) {
     return node;
 }
 
-static ast_node *parse_variable_assignment(char *var_name) {
+static ASTNode *parse_variable_assignment(char *var_name) {
     consume(); // consume `=`
 
-    ast_node *node = make_node(NODE_ASSIGN_EXPR);
+    ASTNode *node = make_node(NODE_ASSIGN_EXPR);
     node->assign.name = var_name;
     node->assign.value = parse_expression();
     
@@ -247,27 +252,27 @@ static ast_node *parse_variable_assignment(char *var_name) {
     return node;
 }
 
-static ast_node *parse_function_call(char *func_name) {
+static ASTNode *parse_function_call(char *func_name) {
     return NULL;
 }
 
-static ast_node *parse_function_declaration() {
+static ASTNode *parse_function_declaration() {
     consume(); // consume keyword `func`
     char *func_name = expect(TOKEN_IDENTIFIER)->str.data;
 
     // Parse identifier
-    ast_node *node = make_node(NODE_FUNC_DECL);
+    ASTNode *node = make_node(NODE_FUNC_DECL);
     node->func_decl.name = func_name;
     node->func_decl.return_type = primitive_types[TYPE_VOID];
 
     // Insert function into current scope
-    symbol *func_sym = symbol_table_insert(current_scope, func_name, SYMBOL_FUNCTION);
+    Symbol *func_sym = symbol_table_insert(current_scope, func_name, SYMBOL_FUNCTION);
     if (!func_sym) {
         error_at_token(tok(), "function `%s` redeclared in scope", func_name);
     }
 
     // Create function scope
-    symbol_table *func_scope = symbol_table_create(func_name);
+    SymbolTable *func_scope = symbol_table_create(func_name);
 
     // Insert function into its own scope for recursion
     symbol_table_insert(func_scope, func_name, SYMBOL_FUNCTION);
@@ -276,19 +281,19 @@ static ast_node *parse_function_declaration() {
     symbol_table_add_child(current_scope, func_scope);
 
     // Parse parameters
-    ast_node params = {0};
-    ast_node *cur = &params;
+    ASTNode params = {0};
+    ASTNode *cur = &params;
 
     expect(TOKEN_LPAREN);
     while (tok()->kind != TOKEN_RPAREN) {
         char *param_name = expect(TOKEN_IDENTIFIER)->str.data;
 
         // Parse identifier
-        ast_node *node = make_node(NODE_VAR_DECL);
+        ASTNode *node = make_node(NODE_VAR_DECL);
         node->var_decl.name = param_name;
 
         // Add paramter to function scope as a variable
-        symbol *param_sym = symbol_table_insert(func_scope, param_name, SYMBOL_VARIABLE);
+        Symbol *param_sym = symbol_table_insert(func_scope, param_name, SYMBOL_VARIABLE);
         if (!param_sym) {
             error_at_token(tok(), "function parameter `%s` redeclared");
         }
@@ -305,7 +310,7 @@ static ast_node *parse_function_declaration() {
             break;
         }
 
-        // Otherwise, consume the comma token and keep going
+        // Otherwise, consume the comma Token and keep going
         consume();
     }
     expect(TOKEN_RPAREN);
@@ -322,11 +327,11 @@ static ast_node *parse_function_declaration() {
     // Enter the function's scope
     enter_scope(func_scope);
 
-    ast_node body = {0};
+    ASTNode body = {0};
     cur = &body;
 
     while (tok()->kind != TOKEN_RBRACE) {
-        ast_node *stmt = NULL;
+        ASTNode *stmt = NULL;
         switch (tok()->kind) {
             case TOKEN_RBRACE: break;
             case TOKEN_CONST:
@@ -345,7 +350,7 @@ static ast_node *parse_function_declaration() {
                         stmt = parse_variable_assignment(identifier);
                         break;
                     default:
-                        error_at_token(tok(), "invalid token `%s` while parsing function body",
+                        error_at_token(tok(), "invalid Token `%s` while parsing function body",
                                 token_as_str(tok()->kind));
                 }
                 break;
@@ -356,7 +361,7 @@ static ast_node *parse_function_declaration() {
                 expect(TOKEN_SEMICOLON);
                 break;
             default:
-                error_at_token(tok(), "invalid token `%s` while parsing function body",
+                error_at_token(tok(), "invalid Token `%s` while parsing function body",
                         token_as_str(tok()->kind));
         }
 
@@ -372,15 +377,15 @@ static ast_node *parse_function_declaration() {
     return node;
 }
 
-ast_node *parse(token_stream *stream) {
+ASTNode *parse(TokenStream *stream) {
     current_scope = global_scope;
     tokens = stream;
 
-    ast_node ast = {0};
-    ast_node *cur = &ast;
+    ASTNode ast = {0};
+    ASTNode *cur = &ast;
 
     while (tok()->kind != TOKEN_EOF) {
-        ast_node *decl = NULL;
+        ASTNode *decl = NULL;
         switch (tok()->kind) {
             case TOKEN_FUNC:
                 decl = parse_function_declaration();
@@ -392,7 +397,7 @@ ast_node *parse(token_stream *stream) {
                 decl = parse_variable_declaration(consume()->str.data);
                 break;
             default:
-                error_at_token(tok(), "invalid token `%s` while parsing top-level",
+                error_at_token(tok(), "invalid Token `%s` while parsing top-level",
                         token_as_str(tok()->kind));
         }
         cur = cur->next = decl;
@@ -401,7 +406,7 @@ ast_node *parse(token_stream *stream) {
     return ast.next;
 }
 
-static void dump_ast_impl(ast_node *root, int level) {
+static void dump_ast_impl(ASTNode *root, int level) {
     if (!root) return;
 
     // indent level
@@ -415,7 +420,7 @@ static void dump_ast_impl(ast_node *root, int level) {
             printf("[FUNC_DECL]: name = %s, return_type = %s, params = [",
                     root->func_decl.name,
                     root->func_decl.return_type.name);
-            ast_node *param = root->func_decl.params;
+            ASTNode *param = root->func_decl.params;
             for (;;) {
                 if (!param) break;
                 printf("%s:%s",
@@ -475,7 +480,7 @@ static void dump_ast_impl(ast_node *root, int level) {
     dump_ast_impl(root->next, level);
 }
 
-void dump_ast(ast_node *program) {
+void dump_ast(ASTNode *program) {
     dump_ast_impl(program, 0);
     printf("\n");
 }
