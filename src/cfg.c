@@ -62,16 +62,15 @@ static void graph_builder_add_block(GraphBuilder *builder, char *tag) {
         graph->blocks = tmp;
     }
     
-    int next_block_id = graph->num_blocks;
-
-    BasicBlock *next_block = &graph->blocks[next_block_id];
-    basic_block_init(next_block, next_block_id, tag);
+    BasicBlock *next_block = &graph->blocks[graph->num_blocks];
+    basic_block_init(next_block, graph->num_blocks++, tag);
 
     builder->curr_block = next_block;
-    graph->num_blocks++;
 }
 
 static void graph_builder_add_node(GraphBuilder *builder, ASTNode *node) {
+    if (!node) return;
+
     BasicBlock *block = builder->curr_block;
     if (block->num_statements >= block->stmt_capacity) {
         block->stmt_capacity <<= 1;
@@ -98,8 +97,10 @@ static void generate_cfg(GraphBuilder *builder, ASTNode *root) {
             graph_builder_add_node(builder, root);
             break;
         case NODE_RET_STMT:
-            graph_builder_add_block(builder, builder->curr_block->tag);
-            graph_builder_add_node(builder, root->ret_stmt.value);
+            if (root->ret_stmt.value) {
+                graph_builder_add_block(builder, builder->curr_block->tag);
+                graph_builder_add_node(builder, root->ret_stmt.value);
+            }
             break;
         case NODE_COND_STMT:
             graph_builder_add_node(builder, root->cond_stmt.expr);
