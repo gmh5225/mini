@@ -1,29 +1,10 @@
 #ifndef MINIGEN_CODEGEN_H
 #define MINIGEN_CODEGEN_H
 
-#include "parse.h"
+#include "ir.h"
 
 #include <stddef.h>
 #include <stdint.h>
-
-typedef struct SSANode SSANode;
-typedef struct BasicBlock BasicBlock;
-
-struct SSANode {
-    int sub;
-    char *name;
-    ASTNode *value;
-    SSANode *next;
-};
-
-struct BasicBlock {
-    int id;
-    char *tag;
-    SSANode *nodes;
-    BasicBlock *next;
-};
-
-BasicBlock *translate_to_ssa(ASTNode *root);
 
 #define DEFAULT_TARGET_CODE_CAPACITY 2048
 

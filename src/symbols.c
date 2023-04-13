@@ -1,5 +1,6 @@
 #include "symbols.h"
 #include "types.h"
+#include "util.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -21,6 +22,9 @@ const char *symbol_as_str(SymbolKind type) {
 
 void init_global_scope() {
     global_scope = symbol_table_create("__GLOBAL__");
+    if (!global_scope) {
+        error("couldn't allocate symbol table for global_scope!");
+    }
 
     // Add supported primitive types to global scope
     for (TypeKind kind = TYPE_VOID; kind <= TYPE_BOOL; kind++) {
@@ -30,23 +34,12 @@ void init_global_scope() {
     }
 }
 
-uint64_t hash(char *s) {
-    uint64_t hash = 5381;
-    int c;
-    while ((c = *s++)) {
-        hash = ((hash << 5) + hash) + c;
-    }
-    return hash;
-}
-
 static Symbol *symbol_info_create(void) {
     Symbol *s = malloc(sizeof(Symbol));
     s->kind = SYMBOL_UNKNOWN;
     s->next = NULL;
     s->type = (Type){.kind = TYPE_UNKNOWN};
     s->name = NULL;
-    s->align = -1;
-    s->offset = -1;
     s->is_constant = false;
     s->is_initialized = false;
     return s;

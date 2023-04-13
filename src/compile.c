@@ -1,5 +1,6 @@
 #include "compile.h"
 #include "codegen.h"
+#include "ir.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,24 +9,15 @@ int compile(ASTNode *program, char *output_filename) {
     CodeBuffer output = {0};
     code_buffer_init(&output);
 
-    BasicBlock *blocks = translate_to_ssa(program);
+    ControlFlowGraph cfg = generate_control_flow_graph(program);
 #ifdef DEBUG
-    printf("Translated to SSA form:\n\n");
-    BasicBlock *block = blocks;
-    while (block) {
+    printf("Control Flow Graph:\n");
+    for (size_t i = 0; i < cfg.num_blocks; i++) {
+        BasicBlock *block = &cfg.blocks[i];
         printf("[BasicBlock %s#%d]\n", block->tag, block->id);
-
-        SSANode *node = block->nodes;
-        while (node) {
-            printf(" SSANode : %s#%d\n", node->name 
-                    ? node->name : "<unknown>"
-                    , node->sub);
-            dump_ast(node->value, 2);
-            node = node->next;
+        for (size_t j = 0; j < block->num_statements; j++) {
+            dump_ast(block->statements[j], 4);
         }
-
-        block = block->next;
-        printf("\n");
     }
 #endif
 

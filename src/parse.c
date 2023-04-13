@@ -281,7 +281,7 @@ static ASTNode *parse_variable_declaration(char *var_name) {
 static ASTNode *parse_variable_assignment(char *var_name) {
     consume(); // consume `=`
 
-    ASTNode *node = make_node(NODE_ASSIGN_EXPR);
+    ASTNode *node = make_node(NODE_ASSIGN_STMT);
     node->assign.name = var_name;
     node->assign.value = parse_expression();
 
@@ -521,10 +521,15 @@ void dump_ast(ASTNode *root, int level) {
             printf("[RET_STMT]:\n");
             dump_ast(root->ret_stmt.value, level + 1);
             break;
+        case NODE_COND_STMT:
+            printf("[COND_STMT]:\n");
+            dump_ast(root->cond_stmt.expr, level + 1);
+            dump_ast(root->cond_stmt.body, level + 2);
+            break;
         case NODE_FUNC_CALL_EXPR:
             printf("[FUNC_CALL]:");
             break;
-        case NODE_ASSIGN_EXPR:
+        case NODE_ASSIGN_STMT:
             printf("[ASSIGN]: name = %s\n", root->assign.name);
             dump_ast(root->assign.value, level + 1);
             break;
@@ -555,7 +560,7 @@ void dump_ast(ASTNode *root, int level) {
         case NODE_REF_EXPR:
             printf("[REF]: name = %s\n", root->ref);
             break;
-        default: error("invalid AST!");
+        default: error("invalid AST! (%d)", root->kind);
     }
 
     dump_ast(root->next, level);

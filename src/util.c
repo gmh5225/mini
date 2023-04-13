@@ -36,6 +36,23 @@ void error_at_token(Token *t, const char *fmt, ...) {
     exit(EXIT_FAILURE);
 }
 
+int str_to_int(const char *s, size_t length) {
+    int n = 0;
+    for (size_t i = 0; i < length; i++) {
+        n = n * 10 + (s[i] - '0');
+    }
+    return n;
+}
+
+uint64_t hash(const char *s) {
+    uint64_t hash = 5381;
+    int c;
+    while ((c = *s++)) {
+        hash = ((hash << 5) + hash) + c;
+    }
+    return hash;
+}
+
 char *rand_str(size_t length) {
     static const char alphabet[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 #define ALPHABET_LENGTH sizeof(alphabet)/sizeof(alphabet[0])
@@ -47,12 +64,4 @@ char *rand_str(size_t length) {
     result[length] = 0;
     return result;
 #undef ALPHABET_LENGTH
-}
-
-int str_to_int(const char *s, size_t length) {
-    int n = 0;
-    for (size_t i = 0; i < length; i++) {
-        n = n * 10 + (s[i] - '0');
-    }
-    return n;
 }

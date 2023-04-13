@@ -19,8 +19,6 @@ struct Symbol {
     Symbol *next;
     Type type;
     char *name;
-    int align;
-    int offset;
     bool is_constant;
     bool is_initialized;
 };

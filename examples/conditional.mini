@@ -1,10 +1,44 @@
 func main() -> int {
-    x := -1
-    y := 0
+    x := -1;
+    y := 0;
 
     if x > 0 {
-        y = 42
+        y = 42;
     }
 
-    return y
+    return y;
 }
+
+/*
+; Mini IR
+
+; BB 1
+entry:
+    x#0 = -1
+    y#0 = 0
+
+    cond = cmp sgt x#0, 0
+
+    y#1 = phi [ y#0, entry ], [ y#2, if.then ]
+    br cond, if.then, if.end
+
+; BB 2
+if.then:
+    y#2 = 42
+
+; BB 3
+if.end:
+    ret y#1
+*/
+
+/*
+; Translated to pseudo-ASM
+entry:
+    mov rax, -1
+    mov rcx, 0
+    cmp rax, 0
+    jle end
+    mov rcx, 42
+end:
+    ret rcx
+*/
