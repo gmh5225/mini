@@ -68,6 +68,7 @@ ASTNode *pop_expr_node() {
 
 static void parse_factor();
 static void parse_term();
+static ASTNode *parse_block(bool);
 
 static ASTNode *parse_unary_expr(char un_op) {
     ASTNode *node = make_node(NODE_UNARY_EXPR);
@@ -131,60 +132,99 @@ static void parse_factor() {
 void parse_term() {
     parse_factor();
     for (;;) {
-        char bin_op = 0;
+        BinaryOp bin_op = BIN_UNKNOWN;
         switch (tok()->kind) {
-            case TOKEN_STAR:
-                bin_op = '*'; consume();
+            case TOKEN_STAR: 
+                bin_op = BIN_MUL; consume(); 
                 break;
-            case TOKEN_SLASH:
-                bin_op = '/'; consume();
+            case TOKEN_SLASH: 
+                bin_op = BIN_DIV; consume(); 
                 break;
             default: break;
         }
 
-        if (bin_op == 0) break;
+        if (bin_op == BIN_UNKNOWN) break;
         push_expr_node(parse_binary_expr(bin_op));
     }
 }
 
 static ASTNode *parse_expression() {
-    char un_op = 0;
+    UnaryOp un_op = UN_UNKNOWN;
     switch (tok()->kind) {
         case TOKEN_MINUS: 
-            un_op = '-'; consume();
+            un_op = UN_NEG; consume(); 
             break;
         case TOKEN_BANG: 
-            un_op = '!'; consume();
+            un_op = UN_NOT; consume(); 
             break;
         case TOKEN_STAR: 
-            un_op = '*'; consume();
+            un_op = UN_DEREF; consume(); 
             break;
         default: break;
     }
 
     parse_term();
 
-    if (un_op > 0) {
+    if (un_op != UN_UNKNOWN) {
         push_expr_node(parse_unary_expr(un_op));
     }
 
     for (;;) {
-        char bin_op = 0;
+        BinaryOp bin_op = BIN_UNKNOWN;
         switch (tok()->kind) {
-            case TOKEN_PLUS:
-                bin_op = '+'; consume();
+            case TOKEN_PLUS: 
+                bin_op = BIN_ADD; consume(); 
                 break;
-            case TOKEN_MINUS:
-                bin_op = '-'; consume();
+            case TOKEN_MINUS: 
+                bin_op = BIN_SUB; consume(); 
+                break;
+            case TOKEN_DOUBLE_EQUAL: 
+                bin_op = BIN_CMP; consume(); 
+                break;
+            case TOKEN_NOT_EQUAL: 
+                bin_op = BIN_CMP_NOT; consume(); 
+                break;
+            case TOKEN_LANGLE: 
+                bin_op = BIN_CMP_LT; consume(); 
+                break;
+            case TOKEN_RANGLE: 
+                bin_op = BIN_CMP_GT; consume(); 
+                break;
+            case TOKEN_LESS_THAN_EQUAL: 
+                bin_op = BIN_CMP_LT_EQ; consume(); 
+                break;
+            case TOKEN_GREATER_THAN_EQUAL: 
+                bin_op = BIN_CMP_GT_EQ; consume(); 
                 break;
             default: break;
         }
 
-        if (bin_op == 0) break;
+        if (bin_op == BIN_UNKNOWN) break;
         push_expr_node(parse_binary_expr(bin_op));
     }
 
     return pop_expr_node();
+}
+
+static ASTNode *parse_conditional() {
+    Token *conditional = consume();
+
+    ASTNode *node = make_node(NODE_COND_STMT);
+
+    switch (conditional->kind) {
+        case TOKEN_IF:
+        case TOKEN_ELIF:
+            // TODO: add typechecking to see if expression is a logical expression
+            node->cond_stmt.expr = parse_expression();
+            break;
+        case TOKEN_ELSE:
+            node->cond_stmt.expr = NULL;
+            break;
+        default: error_at_token(conditional, "invalid conditional");
+    }
+
+    node->cond_stmt.body = parse_block(false);
+    return node;
 }
 
 static Type parse_type() {
@@ -192,9 +232,8 @@ static Type parse_type() {
 
     // Search for type Symbol in current scope
     Symbol *type_sym = symbol_table_lookup(current_scope, type_name);
-    if (!type_sym) {
-        error_at_token(tok(), "unknown type `%s`", type_name);
-    }
+    if (!type_sym) error_at_token(tok(), "unknown type `%s`", type_name);
+
     return type_sym->type;
 }
 
@@ -245,7 +284,7 @@ static ASTNode *parse_variable_assignment(char *var_name) {
     ASTNode *node = make_node(NODE_ASSIGN_EXPR);
     node->assign.name = var_name;
     node->assign.value = parse_expression();
-    
+
     // TODO: add typechecking to see if expression matches declared type for var
 
     expect(TOKEN_SEMICOLON);
@@ -253,7 +292,71 @@ static ASTNode *parse_variable_assignment(char *var_name) {
 }
 
 static ASTNode *parse_function_call(char *func_name) {
+    expect(TOKEN_SEMICOLON);
     return NULL;
+}
+
+static ASTNode *parse_block(bool in_func_toplevel) {
+    expect(TOKEN_LBRACE);
+
+    ASTNode body = {0};
+    ASTNode *cur = &body;
+
+    ASTNode *stmt = NULL;
+    while (tok()->kind != TOKEN_RBRACE) {
+        switch (tok()->kind) {
+            case TOKEN_RBRACE:
+                break;
+            case TOKEN_CONST:
+                stmt = parse_variable_declaration(NULL);
+                break;
+            case TOKEN_IDENTIFIER:
+                char *identifier = consume()->str.data;
+                switch (tok()->kind) {
+                    case TOKEN_LPAREN:
+                        stmt = parse_function_call(identifier);
+                        break;
+                    case TOKEN_WALRUS:
+                        stmt = parse_variable_declaration(identifier);
+                        break;
+                    case TOKEN_EQUAL:
+                        stmt = parse_variable_assignment(identifier);
+                        break;
+                    default:
+                        error_at_token(tok(), "invalid Token `%s` while parsing function body",
+                                token_as_str(tok()->kind));
+                }
+                break;
+            case TOKEN_IF:
+            case TOKEN_ELIF:
+            case TOKEN_ELSE:
+                stmt = parse_conditional();
+                break;
+            case TOKEN_RETURN:
+                consume();
+                stmt = make_node(NODE_RET_STMT);
+                stmt->ret_stmt.value = parse_expression();
+                expect(TOKEN_SEMICOLON);
+                break;
+            default:
+                error_at_token(tok(), "invalid Token `%s` while parsing function body",
+                        token_as_str(tok()->kind));
+        }
+
+        if (!stmt) break;
+        cur = cur->next = stmt;
+    }
+    expect(TOKEN_RBRACE);
+
+    // If the last statement wasn't a return statement, we assume that the function
+    // returns void. Insert this return node to aid with SSA in the initial optimization pass.
+    if (in_func_toplevel && (!stmt || stmt->kind != NODE_RET_STMT)) {
+        ASTNode *implicit = make_node(NODE_RET_STMT);
+        implicit->ret_stmt.value = NULL;
+        cur = cur->next = implicit;
+    }
+
+    return body.next;
 }
 
 static ASTNode *parse_function_declaration() {
@@ -321,64 +424,11 @@ static ASTNode *parse_function_declaration() {
         node->func_decl.return_type = parse_type();
     }
 
-    // Parse function body
-    expect(TOKEN_LBRACE);
-
     // Enter the function's scope
     enter_scope(func_scope);
 
-    ASTNode body = {0};
-    cur = &body;
-
-    ASTNode *stmt = NULL;
-    while (tok()->kind != TOKEN_RBRACE) {
-        switch (tok()->kind) {
-            case TOKEN_RBRACE: break;
-            case TOKEN_CONST:
-                stmt = parse_variable_declaration(NULL);
-                break;
-            case TOKEN_IDENTIFIER:
-                char *identifier = consume()->str.data;
-                switch (tok()->kind) {
-                    case TOKEN_LPAREN:
-                        stmt = parse_function_call(identifier);
-                        break;
-                    case TOKEN_WALRUS:
-                        stmt = parse_variable_declaration(identifier);
-                        break;
-                    case TOKEN_EQUAL:
-                        stmt = parse_variable_assignment(identifier);
-                        break;
-                    default:
-                        error_at_token(tok(), "invalid Token `%s` while parsing function body",
-                                token_as_str(tok()->kind));
-                }
-                break;
-            case TOKEN_RETURN:
-                consume();
-                stmt = make_node(NODE_RET_STMT);
-                stmt->ret_stmt.value = parse_expression();
-                expect(TOKEN_SEMICOLON);
-                break;
-            default:
-                error_at_token(tok(), "invalid Token `%s` while parsing function body",
-                        token_as_str(tok()->kind));
-        }
-
-        if (!stmt) break;
-        cur = cur->next = stmt;
-    }
-    expect(TOKEN_RBRACE);
-
-    // If the last statement wasn't a return statement, we assume that the function
-    // returns void. Insert this return node to aid with SSA in one of the later passes.
-    if (!stmt || stmt->kind != NODE_RET_STMT) {
-        ASTNode *implicit = make_node(NODE_RET_STMT);
-        implicit->ret_stmt.value = NULL;
-        cur = cur->next = implicit;
-    }
-
-    node->func_decl.body = body.next;
+    // Parse function body
+    node->func_decl.body = parse_block(true);
 
     // Exit the function's scope
     exit_scope();
@@ -417,6 +467,26 @@ ASTNode *parse(TokenStream *stream) {
 
 void dump_ast(ASTNode *root, int level) {
     if (!root) return;
+
+    static const char unary_ops[] = {
+        [UN_NEG] = '-',
+        [UN_NOT] = '!',
+        [UN_DEREF] = '*',
+        [UN_ADDR] = '&',
+    };
+
+    static const char *binary_ops[] = {
+        [BIN_ADD] = "+",
+        [BIN_SUB] = "-",
+        [BIN_MUL] = "*",
+        [BIN_DIV] = "/",
+        [BIN_CMP] = "==",
+        [BIN_CMP_NOT] = "!=",
+        [BIN_CMP_LT] = "<",
+        [BIN_CMP_GT] = ">",
+        [BIN_CMP_LT_EQ] = "<=",
+        [BIN_CMP_GT_EQ] = ">=",
+    };
 
     // indent level
     printf("%*s", level, "");
@@ -459,11 +529,13 @@ void dump_ast(ASTNode *root, int level) {
             dump_ast(root->assign.value, level + 1);
             break;
         case NODE_UNARY_EXPR:
-            printf("[UNARY]: op = %c\n", root->unary.un_op);
+            printf("[UNARY]: op = %c\n", 
+                    unary_ops[root->unary.un_op]);
             dump_ast(root->unary.expr, level + 1);
             break;
         case NODE_BINARY_EXPR:
-            printf("[BINARY]: op = %c\n", root->binary.bin_op);
+            printf("[BINARY]: op = %s\n", 
+                    binary_ops[root->binary.bin_op]);
             dump_ast(root->binary.lhs, level + 1);
             dump_ast(root->binary.rhs, level + 1);
             break;

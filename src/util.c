@@ -25,7 +25,9 @@ void error_at(int line, int col, const char *fmt, ...) {
 
 void error_at_token(Token *t, const char *fmt, ...) {
     fprintf(stderr, "mini: at line %d, col %d: on token %s\n -> ", 
-            t->line, t->col, token_as_str(t->kind));
+            t->line, t->col, (t->kind == TOKEN_IDENTIFIER)
+                ? t->str.data
+                : token_as_str(t->kind));
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);

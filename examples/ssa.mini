@@ -10,12 +10,12 @@ func ssa2() {
     y := 0;
     w := 0;
 
-    //if x < 3 {
-    //    y = x * 2;
-    //    w = y;
-    //} else {
-    //    y = x - 3;
-    //}
+    if x < 3 {
+        y = x * 2;
+        w = y;
+    } else {
+        y = x - 3;
+    }
 
     w = x - y;
     z := x + y;

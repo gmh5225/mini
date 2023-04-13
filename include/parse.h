@@ -32,12 +32,39 @@ typedef struct {
 } RetStmt;
 
 typedef struct {
-    char un_op;
+    ASTNode *expr;
+    ASTNode *body;
+} CondStmt;
+
+typedef enum {
+    UN_UNKNOWN,
+    UN_NEG,
+    UN_NOT,
+    UN_DEREF,
+    UN_ADDR,
+} UnaryOp;
+
+typedef struct {
+    UnaryOp un_op;
     ASTNode *expr;
 } UnaryExpr;
 
+typedef enum {
+    BIN_UNKNOWN,
+    BIN_ADD,
+    BIN_SUB,
+    BIN_MUL,
+    BIN_DIV,
+    BIN_CMP,
+    BIN_CMP_NOT,
+    BIN_CMP_LT,
+    BIN_CMP_GT,
+    BIN_CMP_LT_EQ,
+    BIN_CMP_GT_EQ,
+} BinaryOp;
+
 typedef struct {
-    char bin_op;
+    BinaryOp bin_op;
     ASTNode *lhs;
     ASTNode *rhs;
 } BinaryExpr;
@@ -55,8 +82,8 @@ typedef enum {
     NODE_UNKNOWN,
     NODE_FUNC_DECL,
     NODE_VAR_DECL,
-    NODE_IF_STMT,
     NODE_RET_STMT,
+    NODE_COND_STMT,
     NODE_FUNC_CALL_EXPR,
     NODE_ASSIGN_EXPR,
     NODE_UNARY_EXPR,
@@ -73,6 +100,7 @@ struct ASTNode {
         FuncDecl func_decl;
         VarDecl var_decl;
         RetStmt ret_stmt;
+        CondStmt cond_stmt;
         AssignExpr assign;
         UnaryExpr unary;
         BinaryExpr binary;

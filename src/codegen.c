@@ -82,7 +82,7 @@ static void translate_to_ssa_impl(SSAContext *ctx, ASTNode *root) {
         case NODE_RET_STMT:
             ssa_context_add_block(ctx, ctx->curr_block_tag);
             break;
-        case NODE_IF_STMT:
+        case NODE_COND_STMT:
             // For all nodes in the current SSAContext:
             // Construct a BasicBlock
             break;

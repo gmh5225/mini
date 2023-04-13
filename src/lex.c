@@ -31,6 +31,12 @@ const char *token_strings[] = {
     [TOKEN_MINUS] = "-",
     [TOKEN_STAR] = "*",
     [TOKEN_SLASH] = "/",
+    [TOKEN_DOUBLE_EQUAL] = "==",
+    [TOKEN_NOT_EQUAL] = "!=",
+    [TOKEN_LESS_THAN_EQUAL] = "<=",
+    [TOKEN_GREATER_THAN_EQUAL] = ">=",
+    [TOKEN_LANGLE] = "<",
+    [TOKEN_RANGLE] = ">",
     [TOKEN_LBRACE] = "{",
     [TOKEN_RBRACE] = "}",
     [TOKEN_LPAREN] = "(",
@@ -281,12 +287,14 @@ TokenStream lex(FILE *file) {
             case '-': sym = make_token(match('>') ? TOKEN_ARROW : TOKEN_MINUS); break;
             case '*': sym = make_token(TOKEN_STAR); break;
             case '/': sym = make_token(TOKEN_SLASH); break;
-            case '=': sym = make_token(TOKEN_EQUAL); break;
-            case '!': sym = make_token(TOKEN_BANG); break;
+            case '=': sym = make_token(match('=') ? TOKEN_DOUBLE_EQUAL : TOKEN_EQUAL); break;
+            case '!': sym = make_token(match('=') ? TOKEN_NOT_EQUAL : TOKEN_BANG); break;
             case ';': sym = make_token(TOKEN_SEMICOLON); break;
             case ':': sym = make_token(match('=') ? TOKEN_WALRUS : TOKEN_COLON); break;
             case ',': sym = make_token(TOKEN_COMMA); break;
             case '.': sym = make_token(TOKEN_DOT); break;
+            case '<': sym = make_token(match('=') ? TOKEN_LESS_THAN_EQUAL : TOKEN_LANGLE); break;
+            case '>': sym = make_token(match('=') ? TOKEN_GREATER_THAN_EQUAL : TOKEN_RANGLE); break;
             case '{': sym = make_token(TOKEN_LBRACE); break;
             case '}': sym = make_token(TOKEN_RBRACE); break;
             case '(': sym = make_token(TOKEN_LPAREN); break;
