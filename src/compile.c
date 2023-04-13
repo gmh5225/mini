@@ -10,19 +10,22 @@ int compile(ASTNode *program, char *output_filename) {
 
     BasicBlock *blocks = translate_to_ssa(program);
 #ifdef DEBUG
-    printf("Translated to SSA form:\n");
+    printf("Translated to SSA form:\n\n");
     BasicBlock *block = blocks;
     while (block) {
         printf("[BasicBlock %s#%d]\n", block->tag, block->id);
 
         SSANode *node = block->nodes;
         while (node) {
-            printf(" SSANode : %s#%d\n", node->name, node->sub);
+            printf(" SSANode : %s#%d\n", node->name 
+                    ? node->name : "<unknown>"
+                    , node->sub);
             dump_ast(node->value, 2);
             node = node->next;
         }
 
         block = block->next;
+        printf("\n");
     }
 #endif
 

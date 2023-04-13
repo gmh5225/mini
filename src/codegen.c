@@ -29,7 +29,7 @@ void ssa_context_add_node(SSAContext *ctx, char *name, ASTNode *value) {
         // If the variable with that name already exists,
         // increment the new target variable with its previous reference by 1
         size_t len = strlen(name);
-        if ((strlen(iter->name) == len) &&
+        if (iter->name && (strlen(iter->name) == len) &&
                 memcmp(iter->name, name, len) == 0) {
             node->sub = iter->sub + 1;
         }
@@ -64,6 +64,7 @@ void ssa_context_add_block(SSAContext *ctx, char *tag) {
     }
 
     ctx->nodes = NULL;
+    ctx->curr_node_name = NULL;
 }
 
 static void translate_to_ssa_impl(SSAContext *ctx, ASTNode *root) {
@@ -83,8 +84,9 @@ static void translate_to_ssa_impl(SSAContext *ctx, ASTNode *root) {
             ssa_context_add_block(ctx, ctx->curr_block_tag);
             break;
         case NODE_COND_STMT:
-            // For all nodes in the current SSAContext:
-            // Construct a BasicBlock
+            ssa_context_add_block(ctx, ctx->curr_block_tag);
+            translate_to_ssa_impl(ctx, root->cond_stmt.expr);
+            translate_to_ssa_impl(ctx, root->cond_stmt.body);
             break;
         case NODE_ASSIGN_EXPR:
             ssa_context_add_node(ctx, root->assign.name, root->assign.value);
@@ -93,6 +95,9 @@ static void translate_to_ssa_impl(SSAContext *ctx, ASTNode *root) {
         case NODE_BINARY_EXPR:
         case NODE_LITERAL_EXPR:
         case NODE_REF_EXPR:
+            // TODO: Change the SSAContext to include all previous variable references
+            // in this scope. If we found a NODE_REF_EXPR, change the name of the .ref
+            // member to be the latest node name.
             ssa_context_add_node(ctx, ctx->curr_node_name, root);
             break;
         default: break;
