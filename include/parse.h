@@ -82,6 +82,6 @@ struct ASTNode {
 };
 
 ASTNode *parse(TokenStream *stream);
-void dump_ast(ASTNode *program);
+void dump_ast(ASTNode *program, int level);
 
 #endif

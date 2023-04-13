@@ -1,4 +1,6 @@
-#include "minigen/codegen.h"
+#include "codegen.h"
+#include "symbols.h"
+#include "types.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -94,123 +96,114 @@ const char *bss_alloc_directive[] = {
 
 static void add_section(CodegenState *state, char *section_name) {
     CodeBuffer *buf = state->code;
-    cb_write_bytes(buf, "section ", 8);
-    cb_write_bytes(buf, section_name, strlen(section_name));
-    cb_write_bytes(buf, "\n", 2);
+    CB_WRITE(buf, "section ", 8);
+    CB_WRITE(buf, section_name, strlen(section_name));
+    CB_WRITE(buf, "\n", 2);
 }
 
 static void add_label(CodegenState *state, char *label_name) {
     CodeBuffer *buf = state->code;
-    cb_write_bytes(buf, label_name, strlen(label_name));
-    cb_write_bytes(buf, ":\n", 2);
+    CB_WRITE(buf, label_name, strlen(label_name));
+    CB_WRITE(buf, ":\n", 2);
 }
 
 static void add_instruction(CodegenState *state, char *inst, char *op1, char *op2) {
     CodeBuffer *buf = state->code;
-    cb_write_bytes(buf, "    ", 4);
-    cb_write_bytes(buf, inst, strlen(inst));
+    CB_WRITE(buf, "    ", 4);
+    CB_WRITE(buf, inst, strlen(inst));
 
     if (op1) { 
-        cb_write_bytes(buf, " ", 1);
-        cb_write_bytes(buf, op1, strlen(op1)); 
+        CB_WRITE(buf, " ", 1);
+        CB_WRITE(buf, op1, strlen(op1)); 
     }
 
     if (op2) { 
-        cb_write_bytes(buf, ", ", 1);
-        cb_write_bytes(buf, op2, strlen(op2));
+        CB_WRITE(buf, ", ", 1);
+        CB_WRITE(buf, op2, strlen(op2));
     }
 
-    cb_write_bytes(buf, "\n", 1);
+    CB_WRITE(buf, "\n", 1);
 }
 
-void nasm_x86_64_generate(MinigenIR *ir, CodeBuffer *code) {
+#define BUF_SZ 32
+
+void nasm_x86_64_generate(CodeBuffer *code, BasicBlock *program) {
     CodegenState state = {0};
     codegen_state_init(&state, code);
 
-    // Initialize global variables.
-    // Since we do not have constant folding implemented yet,
-    // we store all global variables in the bss section for now and compute their values
-    // in the first few operations of the program.
-
-    // TODO: Create two buffers, one for .data and one for .bss, and append to them
-    // in one pass over the global symbol table. Once done, we can write them both
-    // to the generated_code array.
+    // Allocate space for uninitialized global variables
     add_section(&state, ".bss");
+
+    for (size_t i = 0; i < SYMBOL_TABLE_SIZE; i++) {
+        Symbol *symbol = global_scope->symbols[i];
+        if (symbol->name && symbol->kind == SYMBOL_VARIABLE) {
+            Type type = symbol->type;
+            CB_WRITE(state.code, "    ", 4);
+            CB_WRITE(state.code, symbol->name, strlen(symbol->name));
+            CB_WRITE(state.code, ": ", 2);
+
+            // TODO: fix this
+            char buf[BUF_SZ] = {0};
+            int length = 0;
+
+            // Try to reserve memory using the directive which is the GCD of the type size
+            int rem;
+            if ((rem = type.size % RESQ) == 0) {
+                const char *directive = bss_alloc_directive[RESQ];
+                CB_WRITE(state.code, directive, strlen(directive));
+                length = snprintf(buf, BUF_SZ, " %d\n", rem);
+                CB_WRITE(state.code, buf, length);
+                continue;
+            }
+
+            if ((rem = type.size % RESD) == 0) {
+                const char *directive = bss_alloc_directive[RESD];
+                CB_WRITE(state.code, directive, strlen(directive));
+                length = snprintf(buf, BUF_SZ, " %d\n", rem);
+                CB_WRITE(state.code, buf, length);
+                continue;
+            }
+
+            const char *directive = bss_alloc_directive[RESB];
+            CB_WRITE(state.code, directive, strlen(directive));
+            length = snprintf(buf, BUF_SZ, " %d\n", type.size);
+            CB_WRITE(state.code, buf, length);
+
+            // For .data section:
+            //if (symbol->is_initialized) {
+            //    bool allocated = false;
+            //    for (int sz = DB; sz <= DZ; sz <<= 1) {
+            //        int size = symbol->type.size;
+            //        if (size == sz) {
+            //            const char *directive = mem_alloc_directive[size];
+            //            CB_WRITE(code->buffer, INDENT);
+            //            CB_WRITE(code->buffer, symbol->name, strlen(symbol->name));
+            //            CB_WRITE(code->buffer, " ", 1);
+            //            CB_WRITE(code->buffer, directive, strlen(directive));
+
+            //            char literal[128];
+            //            int length = 0;
+            //            switch (symbol->type.kind) {
+            //                case TYPE_VOID: 
+            //                    error("cannot allocate memory for void type");
+            //                    break;
+            //                case TYPE_INT:
+            //                    break;
+            //                default: error("invalid type in codegen: %d", symbol->type.kind);
+            //            }
+
+            //            CB_WRITE(code->buffer, literal, length);
+            //            allocated = true;
+            //        }
+            //    }
+
+            //    if (!allocated) {
+            //        error("global struct initialization not yet supported!");
+            //    }
+            //}
+        }
+    }
 
     add_section(&state, ".text");
     add_instruction(&state, "global", "_start", NULL);
-
-    /*
-       for (size_t i = 0; i < SYMBOL_TABLE_SIZE; i++) {
-       symbol *symbol = global_scope->symbols[i];
-       if (symbol->name && symbol->kind == SYMBOL_VARIABLE) {
-       type type = symbol->type;
-       cb_write_bytes(code->buffer, "    ", 4);
-       cb_write_bytes(code->buffer, symbol->name, strlen(symbol->name));
-       cb_write_bytes(code->buffer, ": ", 2);
-
-#define BUF_SZ 128
-    // TODO: fix this
-    char buf[BUF_SZ] = {0};
-    int length = 0;
-
-    // Try to reserve memory using the directive which is the GCD of the type size
-    int rem;
-    if ((rem = type.size % RESQ) == 0) {
-    const char *directive = bss_alloc_directive[RESQ];
-    cb_write_bytes(code->buffer, directive, strlen(directive));
-    length = snprintf(buf, BUF_SZ, " %d\n", rem);
-    cb_write_bytes(code->buffer, buf, length);
-    continue;
-    }
-
-    if ((rem = type.size % RESD) == 0) {
-    const char *directive = bss_alloc_directive[RESD];
-    cb_write_bytes(code->buffer, directive, strlen(directive));
-    length = snprintf(buf, BUF_SZ, " %d\n", rem);
-    cb_write_bytes(code->buffer, buf, length);
-    continue;
-    }
-
-    const char *directive = bss_alloc_directive[RESB];
-    cb_write_bytes(code->buffer, directive, strlen(directive));
-    length = snprintf(buf, BUF_SZ, " %d\n", type.size);
-    cb_write_bytes(code->buffer, buf, length);
-#undef BUF_SZ
-
-    // For .data section:
-    //if (symbol->is_initialized) {
-    //    bool allocated = false;
-    //    for (int sz = DB; sz <= DZ; sz <<= 1) {
-    //        int size = symbol->type.size;
-    //        if (size == sz) {
-    //            const char *directive = mem_alloc_directive[size];
-    //            cb_write_bytes(code->buffer, INDENT);
-    //            cb_write_bytes(code->buffer, symbol->name, strlen(symbol->name));
-    //            cb_write_bytes(code->buffer, " ", 1);
-    //            cb_write_bytes(code->buffer, directive, strlen(directive));
-
-    //            char literal[128];
-    //            int length = 0;
-    //            switch (symbol->type.kind) {
-    //                case TYPE_VOID: 
-    //                    error("cannot allocate memory for void type");
-    //                    break;
-    //                case TYPE_INT:
-    //                    break;
-    //                default: error("invalid type in codegen: %d", symbol->type.kind);
-    //            }
-
-    //            cb_write_bytes(code->buffer, literal, length);
-    //            allocated = true;
-    //        }
-    //    }
-
-    //    if (!allocated) {
-    //        error("global struct initialization not yet supported!");
-    //    }
-    //}
-    }
-}
-*/
 }

@@ -3,6 +3,6 @@
 
 #include "parse.h"
 
-int compile(ASTNode *program);
+int compile(ASTNode *program, char *output_filename);
 
 #endif

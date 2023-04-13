@@ -330,8 +330,8 @@ static ASTNode *parse_function_declaration() {
     ASTNode body = {0};
     cur = &body;
 
+    ASTNode *stmt = NULL;
     while (tok()->kind != TOKEN_RBRACE) {
-        ASTNode *stmt = NULL;
         switch (tok()->kind) {
             case TOKEN_RBRACE: break;
             case TOKEN_CONST:
@@ -369,6 +369,15 @@ static ASTNode *parse_function_declaration() {
         cur = cur->next = stmt;
     }
     expect(TOKEN_RBRACE);
+
+    // If the last statement wasn't a return statement, we assume that the function
+    // returns void. Insert this return node to aid with SSA in one of the later passes.
+    if (!stmt || stmt->kind != NODE_RET_STMT) {
+        ASTNode *implicit = make_node(NODE_RET_STMT);
+        implicit->ret_stmt.value = NULL;
+        cur = cur->next = implicit;
+    }
+
     node->func_decl.body = body.next;
 
     // Exit the function's scope
@@ -406,7 +415,7 @@ ASTNode *parse(TokenStream *stream) {
     return ast.next;
 }
 
-static void dump_ast_impl(ASTNode *root, int level) {
+void dump_ast(ASTNode *root, int level) {
     if (!root) return;
 
     // indent level
@@ -430,33 +439,33 @@ static void dump_ast_impl(ASTNode *root, int level) {
                 printf("%s", param ? ", " : "");
             }
             printf("]\n");
-            dump_ast_impl(root->func_decl.body, level + 1);
+            dump_ast(root->func_decl.body, level + 1);
             break;
         case NODE_VAR_DECL:
             printf("[VAR_DECL]: name = %s, type = %s\n",
                     root->var_decl.name,
                     root->var_decl.type.name);
-            dump_ast_impl(root->var_decl.init, level + 1);
+            dump_ast(root->var_decl.init, level + 1);
             break;
         case NODE_RET_STMT:
             printf("[RET_STMT]:\n");
-            dump_ast_impl(root->ret_stmt.value, level + 1);
+            dump_ast(root->ret_stmt.value, level + 1);
             break;
         case NODE_FUNC_CALL_EXPR:
             printf("[FUNC_CALL]:");
             break;
         case NODE_ASSIGN_EXPR:
             printf("[ASSIGN]: name = %s\n", root->assign.name);
-            dump_ast_impl(root->assign.value, level + 1);
+            dump_ast(root->assign.value, level + 1);
             break;
         case NODE_UNARY_EXPR:
             printf("[UNARY]: op = %c\n", root->unary.un_op);
-            dump_ast_impl(root->unary.expr, level + 1);
+            dump_ast(root->unary.expr, level + 1);
             break;
         case NODE_BINARY_EXPR:
             printf("[BINARY]: op = %c\n", root->binary.bin_op);
-            dump_ast_impl(root->binary.lhs, level + 1);
-            dump_ast_impl(root->binary.rhs, level + 1);
+            dump_ast(root->binary.lhs, level + 1);
+            dump_ast(root->binary.rhs, level + 1);
             break;
         case NODE_LITERAL_EXPR:
             printf("[LITERAL]: value = ");
@@ -477,10 +486,5 @@ static void dump_ast_impl(ASTNode *root, int level) {
         default: error("invalid AST!");
     }
 
-    dump_ast_impl(root->next, level);
-}
-
-void dump_ast(ASTNode *program) {
-    dump_ast_impl(program, 0);
-    printf("\n");
+    dump_ast(root->next, level);
 }

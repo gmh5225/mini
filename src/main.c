@@ -86,9 +86,9 @@ int main(int argc, char **argv) {
     ASTNode *program = parse(&stream);
 
     if (opts.dump_flags & DUMP_AST) {
-        dump_ast(program);
+        dump_ast(program, 0);
     }
 
     printf("compiling to `%s`\n", opts.output_filename);
-    return compile(program);
+    return compile(program, opts.output_filename);
 }
