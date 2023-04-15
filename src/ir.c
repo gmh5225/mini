@@ -1,6 +1,6 @@
 #include "ir.h"
-#include "table.h"
-#include "util.h"
+#include "util/table.h"
+#include "util/util.h"
 
 #include <stdlib.h>
 #include <string.h>

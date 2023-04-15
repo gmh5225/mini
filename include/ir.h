@@ -2,22 +2,18 @@
 #define MINI_IR_H
 
 #include "parse.h"
+#include "util/vector.h"
 
 #include <stddef.h>
 
-typedef struct {
+typedef struct BasicBlock BasicBlock;
+struct BasicBlock {
     int id;
     char *tag;
-    int *predecessors;
-    size_t num_predecessors;
-    size_t pred_capacity;
-    int *successors;
-    size_t num_successors;
-    size_t succ_capacity;
-    ASTNode **statements;
-    size_t num_statements;
-    size_t stmt_capacity;
-} BasicBlock;
+    Vector predecessors;    // BasicBlock *
+    Vector successors;      // BasicBlock *
+    Vector statements;      // ASTNode *
+};
 
 typedef struct {
     BasicBlock *blocks;

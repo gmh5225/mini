@@ -17,7 +17,7 @@ typedef struct {
 } Register;
 
 enum { R_RAX, R_RBX, R_RCX, R_RDX,
-    R_RSP, R_RBP, R_RSI, R_RDI, 
+    R_RSP, R_RBP, R_RSI, R_RDI,
     R_R8, R_R9, R_R10, R_R11, R_R12 };
 
 #define NUM_REGISTERS R_R12 + 1
@@ -31,8 +31,8 @@ static const Register registers_nasm_x86_64[] = {
     [R_RBP] = { R_RBP, "rbp", true, false },
     [R_RSI] = { R_RSI, "rsi", false, false },
     [R_RDI] = { R_RDI, "rdi", false, false },
-    [R_R8]  = { R_R8, "r8", false, false },
-    [R_R9]  = { R_R9, "r9", false, false },
+    [R_R8]  = { R_R8,  "r8", false, false },
+    [R_R9]  = { R_R9,  "r9", false, false },
     [R_R10] = { R_R10, "r10", false, false },
     [R_R11] = { R_R11, "r11", false, false },
     [R_R12] = { R_R12, "r12", true, false },

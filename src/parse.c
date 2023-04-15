@@ -1,6 +1,6 @@
 #include "parse.h"
 #include "symbols.h"
-#include "util.h"
+#include "util/util.h"
 
 #include <stdio.h>
 #include <stdlib.h>

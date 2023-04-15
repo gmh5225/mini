@@ -2,10 +2,11 @@ TARGET = mini
 
 SRC_DIR = src
 INC_DIR	= include
+BUILD_DIR = build
 
-SRCS = $(wildcard $(SRC_DIR)/*.c)
-OBJS = $(SRC:.c=.o)
-DEPS = $(OBJ:.o=.d)
+SRCS = $(shell find $(SRC_DIR) -name '*.c')
+OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRCS))
+DEPS = $(patsubst $(BUILD_DIR)/%.o,$(BUILD_DIR)/%.d,$(OBJS))
 
 CC = gcc
 CFLAGS = -Wall -Werror -MMD -std=c11 -I./$(INC_DIR)
@@ -19,17 +20,18 @@ debug: CFLAGS := $(filter-out -Werror, $(CFLAGS))
 debug: all
 
 $(TARGET): $(SRCS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR):
+	mkdir -p $@
+
+-include $(DEP)
 
 .PHONY: clean
 clean:
-	rm -f $(OBJ) $(TARGET)
+	rm -rf $(BUILD_DIR)
 
-.PHONY: cleandep
-cleandep:
-	rm -f $(DEP)
-
-.PHONY: cleanall
-cleanall: clean cleandep
-
--include $(DEP)
+.PHONY: all clean

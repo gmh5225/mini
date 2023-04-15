@@ -1,6 +1,6 @@
 #include "symbols.h"
 #include "types.h"
-#include "util.h"
+#include "util/util.h"
 
 #include <stdio.h>
 #include <stdbool.h>

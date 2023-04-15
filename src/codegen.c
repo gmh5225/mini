@@ -1,5 +1,5 @@
 #include "codegen.h"
-#include "util.h"
+#include "util/util.h"
 
 #include <stdio.h>
 #include <stdlib.h>

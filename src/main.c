@@ -2,7 +2,7 @@
 #include "parse.h"
 #include "symbols.h"
 #include "compile.h"
-#include "util.h"
+#include "util/util.h"
 
 #include <stdbool.h>
 #include <stdio.h>
