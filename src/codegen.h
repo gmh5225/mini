@@ -1,8 +1,9 @@
-#ifndef MINIGEN_CODEGEN_H
-#define MINIGEN_CODEGEN_H
+#ifndef MINI_CODEGEN_H
+#define MINI_CODEGEN_H
 
 #include "ir.h"
-
+#include "parse.h"
+#include "table.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -22,7 +23,7 @@ void code_buffer_write_bytes(CodeBuffer *code, char *bytes, size_t length);
 void code_buffer_write_to_file(CodeBuffer *code, char *filename);
 void code_buffer_free(CodeBuffer *code);
 
-/* Backend entry points */
-void nasm_x86_64_generate(CodeBuffer *code, BasicBlock *program);
+/* Available Backends */
+CodeBuffer nasm_x86_64_generate(Program program);
 
 #endif

@@ -1,14 +1,16 @@
-#ifndef MINI_VECTOR_H
+#ifndef MINI_VECTOR_H 
 #define MINI_VECTOR_H
 
 #include <stddef.h>
 
-typedef struct {
+typedef struct Vector Vector;
+struct Vector
+{
     size_t elem_size;
     size_t size;
     size_t capacity;
     void **data;
-} Vector;
+};
 
 void vector_init(Vector *v, size_t elem_size);
 void vector_push_back(Vector *v, void *value);

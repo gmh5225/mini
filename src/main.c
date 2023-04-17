@@ -1,24 +1,33 @@
 #include "lex.h"
 #include "parse.h"
+#include "ir.h"
 #include "symbols.h"
 #include "compile.h"
-#include "util/util.h"
-
+#include "util.h"
+#include "vector.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-enum { DUMP_TOKENS = 1, DUMP_AST };
+enum 
+{ 
+    DUMP_TOKENS = 1 << 1, 
+    DUMP_AST = 1 << 2,
+    DUMP_IR = 1 << 3,
+};
 
-typedef struct {
+typedef struct MiniOpts MiniOpts;
+struct MiniOpts
+{
     int dump_flags;
     char *input_filename;
     char *output_filename;
-} MiniOpts;
+};
 
-MiniOpts parse_mini_options(int argc, char **argv) {
+MiniOpts parse_mini_options(int argc, char **argv)
+{
     MiniOpts opts = {
         .dump_flags = 0,
         .input_filename = NULL,
@@ -50,6 +59,11 @@ MiniOpts parse_mini_options(int argc, char **argv) {
             continue;
         }
 
+        if (strcmp(arg, "-IR") == 0) {
+            opts.dump_flags |= DUMP_IR;
+            continue;
+        }
+
         opts.input_filename = arg;
     }
 
@@ -60,7 +74,8 @@ MiniOpts parse_mini_options(int argc, char **argv) {
     return opts;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     MiniOpts opts = parse_mini_options(argc, argv);
     srand(time(NULL));
 
@@ -71,24 +86,35 @@ int main(int argc, char **argv) {
 
     init_global_scope();
 
-    TokenStream stream = lex(file);
+    Vector tokens = lex(file);
+    if (opts.dump_flags & DUMP_TOKENS) {
+        for (size_t i = 0; i < tokens.size; i++) {
+            Token *token = (Token *)vector_get(&tokens, i);
+            if (token->kind == TOKEN_EOF) break;
+            printf("%s\n", token_as_str(token->kind));
+        }
+    }
     fclose(file);
 
-    if (opts.dump_flags & DUMP_TOKENS) {
-        for (;;) {
-            Token *t = token_stream_next(&stream);
-            if (t->kind == TOKEN_EOF) break;
-            printf("%s\n", token_as_str(t->kind));
-        }
-        stream.pos = 0; // reset stream pos after printing tokens
+    ASTNode *ast = parse(tokens);
+    if (opts.dump_flags & DUMP_AST) {
+        dump_ast(ast, 0);
+        symbol_table_dump(global_scope, 0);
     }
 
-    ASTNode *program = parse(&stream);
-
-    if (opts.dump_flags & DUMP_AST) {
-        dump_ast(program, 0);
+    Program program = emit_ir(ast);
+    if (opts.dump_flags & DUMP_IR) {
+        BasicBlock *block = program.blocks;
+        while (block) {
+            printf("[BasicBlock %s#%d]\n", block->tag, block->id);
+            printf("  %ld predecessors, %ld successors, %ld instructions\n",
+                    block->predecessors.size, 
+                    block->successors.size,
+                    block->instructions.size);
+            block = block->next;
+        }
     }
 
     printf("compiling to `%s`\n", opts.output_filename);
-    return compile(program, opts.output_filename);
+    return 0;
 }

@@ -1,3 +1,4 @@
+
 func main() -> int {
     x := -1;
     y := 0;
@@ -12,33 +13,16 @@ func main() -> int {
 /*
 ; Mini IR
 
-; BB 1
-entry:
-    x#0 = -1
-    y#0 = 0
-
-    cond = cmp sgt x#0, 0
-
-    y#1 = phi [ y#0, entry ], [ y#2, if.then ]
-    br cond, if.then, if.end
-
-; BB 2
-if.then:
-    y#2 = 42
-
-; BB 3
-if.end:
-    ret y#1
-*/
-
-/*
-; Translated to pseudo-ASM
-entry:
-    mov rax, -1
-    mov rcx, 0
-    cmp rax, 0
-    jle end
-    mov rcx, 42
-end:
-    ret rcx
+def i32 main:
+    %x = alloc i32 1
+    store i32 %x -1
+    %y = alloc i32 1
+    store i32 %y 0
+    %cond = alloc bool 1
+    store %cond, cmp_gt %x, 0
+    br %cond, %cond.true, %cond.false
+cond.true:
+    %y = 42
+cond.false:
+    ret %y
 */

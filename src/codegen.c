@@ -1,10 +1,11 @@
 #include "codegen.h"
-#include "util/util.h"
+#include "util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* CodeBuffer */
 void code_buffer_init(CodeBuffer *code) {
     code->buffer = calloc(DEFAULT_TARGET_CODE_CAPACITY, sizeof(char));
     code->code_length = 0;

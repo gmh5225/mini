@@ -1,12 +1,16 @@
 #ifndef MINI_LEX_H
 #define MINI_LEX_H
 
+#include "vector.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stddef.h>
 
-typedef enum {
+typedef enum TokenKind TokenKind;
+enum TokenKind
+{
     TOKEN_UNKNOWN = 0, // Misc
     TOKEN_EOF,
     TOKEN_CONST, // Keywords
@@ -48,7 +52,7 @@ typedef enum {
     TOKEN_ARROW,
     TOKEN_IDENTIFIER, // User-defined
     TOKEN_NUMBER,
-} TokenKind;
+};
 
 extern const char *token_strings[];
 const char *token_as_str(TokenKind kind);
@@ -58,7 +62,8 @@ const char *token_as_str(TokenKind kind);
 #define STRING_MAX_LEN      4096
 
 typedef struct Token Token;
-struct Token {
+struct Token
+{
     TokenKind kind;
     int line, col;
     union {
@@ -75,19 +80,6 @@ struct Token {
     };
 };
 
-typedef struct {
-    Token *tokens;
-    size_t pos;
-    size_t size;
-    size_t capacity;
-} TokenStream;
-
-TokenStream token_stream_create();
-void token_stream_append(TokenStream *stream, Token token);
-Token *token_stream_get(TokenStream *stream);
-Token *token_stream_next(TokenStream *stream);
-Token *token_stream_prev(TokenStream *stream);
-
-TokenStream lex(FILE *file);
+Vector lex(FILE *file); // Token
 
 #endif

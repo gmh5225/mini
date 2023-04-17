@@ -1,22 +1,17 @@
-#include "util/table.h"
-#include "util/util.h"
-
+#include "table.h"
+#include "util.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-struct TableEntry {
-    char *key;
-    void *value;
-    TableEntry *next;
-};
-
-Table *table_new() {
+Table *table_new()
+{
     Table *table = calloc(1, sizeof(Table));
     return table;
 }
 
-void table_insert(Table *table, const char *key, void *value) {
+void table_insert(Table *table, const char *key, void *value)
+{
     uint64_t index = hash(key) % TABLE_SIZE;
     TableEntry *entry = table->entries[index];
 
@@ -37,7 +32,8 @@ void table_insert(Table *table, const char *key, void *value) {
     table->entries[index] = new_entry;
 }
 
-void *table_lookup(Table *table, const char *key) {
+void *table_lookup(Table *table, const char *key)
+{
     uint64_t index = hash(key) % TABLE_SIZE;
     TableEntry *entry = table->entries[index];
 
@@ -50,7 +46,8 @@ void *table_lookup(Table *table, const char *key) {
     return NULL;
 }
 
-void table_clear(Table *table) {
+void table_clear(Table *table)
+{
     for (size_t i = 0; i < TABLE_SIZE; i++) {
         TableEntry *entry = table->entries[i];
         while (entry) {
@@ -62,7 +59,8 @@ void table_clear(Table *table) {
     }
 }
 
-void table_free(Table *table) {
+void table_free(Table *table)
+{
     if (table) {
         table_clear(table);
         free(table);

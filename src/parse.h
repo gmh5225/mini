@@ -3,53 +3,77 @@
 
 #include "lex.h"
 #include "types.h"
+#include "vector.h"
 
 #include <stdint.h>
 #include <stdbool.h>
 
 typedef struct ASTNode ASTNode;
+typedef enum NodeKind NodeKind;
 
-typedef struct {
+typedef struct FuncDecl FuncDecl;
+typedef struct VarDecl VarDecl;
+
+typedef struct AssignStmt AssignStmt;
+typedef struct RetStmt RetStmt;
+typedef struct CondStmt CondStmt;
+
+typedef enum UnaryOp UnaryOp;
+typedef enum BinaryOp BinaryOp;
+typedef struct UnaryExpr UnaryExpr;
+typedef struct BinaryExpr BinaryExpr;
+
+typedef union Literal Literal;
+
+struct FuncDecl
+{
     char *name;
     Type return_type;
-    ASTNode *params; 
+    ASTNode *params;
     ASTNode *body;
-} FuncDecl;
+};
 
-typedef struct {
+struct VarDecl 
+{
     char *name;
     Type type;
     ASTNode *init;
-} VarDecl;
+};
 
-typedef struct {
+struct AssignStmt 
+{
     char *name;
     ASTNode *value;
-} AssignExpr;
+};
 
-typedef struct {
+struct RetStmt
+{
     ASTNode *value;
-} RetStmt;
+};
 
-typedef struct {
+struct CondStmt 
+{
     ASTNode *expr;
     ASTNode *body;
-} CondStmt;
+};
 
-typedef enum {
+enum UnaryOp
+{
     UN_UNKNOWN,
     UN_NEG,
     UN_NOT,
     UN_DEREF,
     UN_ADDR,
-} UnaryOp;
+};
 
-typedef struct {
+struct UnaryExpr
+{
     UnaryOp un_op;
     ASTNode *expr;
-} UnaryExpr;
+};
 
-typedef enum {
+enum BinaryOp
+{
     BIN_UNKNOWN,
     BIN_ADD,
     BIN_SUB,
@@ -61,24 +85,31 @@ typedef enum {
     BIN_CMP_GT,
     BIN_CMP_LT_EQ,
     BIN_CMP_GT_EQ,
-} BinaryOp;
+};
 
-typedef struct {
+struct BinaryExpr
+{
     BinaryOp bin_op;
     ASTNode *lhs;
     ASTNode *rhs;
-} BinaryExpr;
+};
 
-typedef union {
+union Literal
+{
     intmax_t i_val;
     uintmax_t u_val;
     float f_val;
     double d_val;
     char c_val;
     bool b_val;
-} Literal;
+    struct {
+        char *s_val;
+        size_t s_len;
+    };
+};
 
-typedef enum {
+enum NodeKind
+{
     NODE_UNKNOWN,
     NODE_FUNC_DECL,
     NODE_VAR_DECL,
@@ -90,18 +121,20 @@ typedef enum {
     NODE_BINARY_EXPR,
     NODE_LITERAL_EXPR,
     NODE_REF_EXPR,
-} NodeKind;
+};
 
-struct ASTNode {
+struct ASTNode
+{
     NodeKind kind;
     ASTNode *next;
     Type type;
-    union {
+    union
+    {
         FuncDecl func_decl;
         VarDecl var_decl;
         RetStmt ret_stmt;
         CondStmt cond_stmt;
-        AssignExpr assign;
+        AssignStmt assign;
         UnaryExpr unary;
         BinaryExpr binary;
         Literal literal;
@@ -109,7 +142,7 @@ struct ASTNode {
     };
 };
 
-ASTNode *parse(TokenStream *stream);
+ASTNode *parse(Vector tokens);
 void dump_ast(ASTNode *program, int level);
 
 #endif

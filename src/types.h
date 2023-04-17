@@ -3,9 +3,9 @@
 
 #include <stdbool.h>
 
-typedef struct Type Type;
-
-typedef enum {
+typedef enum TypeKind TypeKind;
+enum TypeKind
+{
     TYPE_UNKNOWN,
     TYPE_VOID, // Primitive types
     TYPE_INT,
@@ -16,9 +16,11 @@ typedef enum {
     TYPE_BOOL,
     TYPE_STRUCT, // User-defined
     TYPE_ENUM,
-} TypeKind;
+};
 
-struct Type {
+typedef struct Type Type;
+struct Type
+{
     TypeKind kind;
     char *name;
     int align;

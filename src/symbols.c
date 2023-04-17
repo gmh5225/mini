@@ -1,6 +1,6 @@
 #include "symbols.h"
 #include "types.h"
-#include "util/util.h"
+#include "util.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -10,17 +10,18 @@
 
 SymbolTable *global_scope = NULL;
 
-const char *symbol_strings[] = {
+const char *symbol_strings[] =
+{
     [SYMBOL_UNKNOWN] = "[UNKNOWN SYMBOL]",
     [SYMBOL_VARIABLE] = "[VARIABLE]",
     [SYMBOL_FUNCTION] = "[FUNCTION]",
+    [SYMBOL_TYPE] = "[TYPE]",
 };
 
-const char *symbol_as_str(SymbolKind type) {
-    return symbol_strings[type];
-}
+const char *symbol_as_str(SymbolKind type) { return symbol_strings[type]; }
 
-void init_global_scope() {
+void init_global_scope()
+{
     global_scope = symbol_table_create("__GLOBAL__");
     if (!global_scope) {
         error("couldn't allocate symbol table for global_scope!");
@@ -29,12 +30,13 @@ void init_global_scope() {
     // Add supported primitive types to global scope
     for (TypeKind kind = TYPE_VOID; kind <= TYPE_BOOL; kind++) {
         Type primitive = primitive_types[kind];
-        Symbol *p_type_sym = symbol_table_insert(global_scope, primitive.name, SYMBOL_TYPE);
-        p_type_sym->type = primitive;
+        Symbol *primitive_sym = symbol_table_insert(global_scope, primitive.name, SYMBOL_TYPE);
+        primitive_sym->type = primitive;
     }
 }
 
-static Symbol *symbol_info_create(void) {
+static Symbol *symbol_info_create(void)
+{
     Symbol *s = malloc(sizeof(Symbol));
     s->kind = SYMBOL_UNKNOWN;
     s->next = NULL;
@@ -45,14 +47,15 @@ static Symbol *symbol_info_create(void) {
     return s;
 }
 
-SymbolTable *symbol_table_create(char *name) {
+SymbolTable *symbol_table_create(char *name)
+{
     size_t length = strlen(name);
     SymbolTable *table = malloc(sizeof(SymbolTable));
     table->name = malloc(sizeof(char) * (length + 1));
     memcpy(table->name, name, length);
     table->name[length] = 0;
 
-    // Preallocate all symbol_info entries in hash table
+    // Preallocate all symbol entries in hash table
     for (size_t i = 0; i < SYMBOL_TABLE_SIZE; i++) {
         table->symbols[i] = symbol_info_create();
     }
@@ -64,16 +67,16 @@ SymbolTable *symbol_table_create(char *name) {
     return table;
 }
 
-Symbol *symbol_table_insert(SymbolTable *table, char *symbol_name, SymbolKind kind) {
+Symbol *symbol_table_insert(SymbolTable *table, char *symbol_name, SymbolKind kind)
+{
     if (!table) return NULL;
 
     // Check if the Symbol already exists in one of the current table or parent tables.
     // If the Symbol is a function, ignore this check as we will still add it to its own
     // scope to allow for recursion.
     Symbol *exists = NULL;
-    if ((exists = symbol_table_lookup(table, symbol_name))) {
+    if ((exists = symbol_table_lookup(table, symbol_name)))
         return NULL;
-    }
 
     uint64_t index = hash(symbol_name) % SYMBOL_TABLE_SIZE;
     Symbol *info = table->symbols[index];
@@ -95,7 +98,8 @@ Symbol *symbol_table_insert(SymbolTable *table, char *symbol_name, SymbolKind ki
     return info;
 }
 
-Symbol *symbol_table_lookup(SymbolTable *table, char *symbol_name) {
+Symbol *symbol_table_lookup(SymbolTable *table, char *symbol_name)
+{
     if (!table) return NULL;
 
     uint64_t index = hash(symbol_name) % SYMBOL_TABLE_SIZE;
@@ -109,46 +113,34 @@ Symbol *symbol_table_lookup(SymbolTable *table, char *symbol_name) {
     }
 
     // If we couldn't find the Symbol in the current scope, do lookup in the parent
-    if (table->parent) {
+    if (table->parent)
         return symbol_table_lookup(table->parent, symbol_name);
-    }
 
     return NULL;
 }
 
-void symbol_table_add_child(SymbolTable *parent, SymbolTable *child) {
+void symbol_table_add_child(SymbolTable *parent, SymbolTable *child)
+{
     parent->child = child;
     child->parent = parent;
 }
 
-void symbol_table_dump_impl(SymbolTable *table, int level) {
-    for (int i = 0; i < level; i++) {
-        printf("    ");
-    }
-
-    printf("Scope: %s\n", table->name);
+void symbol_table_dump(SymbolTable *table, int level)
+{
+    printf("%*sScope: %s\n", level, "", table->name);
     for (size_t i = 0; i < SYMBOL_TABLE_SIZE; i++) {
         Symbol *info = table->symbols[i];
         while (info && info->name) {
-            for (int i = 0; i < level; i++) {
-                printf("    ");
-            }
-            printf("  name: %s, type: %s", 
-                    info->name, symbol_as_str(info->kind));
+            printf("%*s name: %s, kind: %s", 
+                    level, "", info->name, symbol_as_str(info->kind));
             printf(info->next ? "  ->  " : "\n");
             info = info->next;
         }
     }
 
-    if (table->child) {
-        symbol_table_dump_impl(table->child, level + 1);
-    }
+    if (table->child)
+        symbol_table_dump(table->child, level + 1);
 
-    if (table->next) {
-        symbol_table_dump_impl(table->next, level);
-    }
-}
-
-void symbol_table_dump(SymbolTable *table) {
-    symbol_table_dump_impl(table, 0);
+    if (table->next)
+        symbol_table_dump(table->next, level);
 }

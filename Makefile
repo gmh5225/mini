@@ -8,9 +8,8 @@ SRCS = $(shell find $(SRC_DIR) -name '*.c')
 OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRCS))
 DEPS = $(patsubst $(BUILD_DIR)/%.o,$(BUILD_DIR)/%.d,$(OBJS))
 
-CC = gcc
 CFLAGS = -Wall -Werror -MMD -std=c11 -I./$(INC_DIR)
-LDFLAGS =
+LDFLAGS = 
 
 all: $(TARGET)
 
@@ -19,7 +18,7 @@ debug: CFLAGS += -DDEBUG -g
 debug: CFLAGS := $(filter-out -Werror, $(CFLAGS))
 debug: all
 
-$(TARGET): $(SRCS)
+$(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)

@@ -1,9 +1,8 @@
 const foo: bool = false;
 
-//
-//func add_two(x: int, y: int) -> int {
-//    return x + y;
-//}
+func add_two(x: int, y: int) -> int {
+    return x + y;
+}
 
 // This is a comment
 func main() -> int {

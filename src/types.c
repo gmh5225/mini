@@ -2,7 +2,8 @@
 
 #include <stdint.h>
 
-const Type primitive_types[] = {
+const Type primitive_types[] =
+{
     [TYPE_VOID] = {
         .kind = TYPE_VOID,
         .name = "void",
