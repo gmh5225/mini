@@ -124,15 +124,14 @@ static void emit(IRBuilder *builder, ASTNode *node)
         case NODE_COND_STMT:
             break;
         case NODE_RET_STMT:
-            const char *return_prefix = "$ret_"; // length 5
+            const char *return_prefix = "ret."; // length 4
             char *block_tag = builder->current_block->tag;
             size_t block_tag_length = strlen(block_tag);
 
-            size_t length = 5 + block_tag_length + 1;
+            size_t length = 4 + block_tag_length + 1;
             char *return_label = calloc(length, sizeof(char));
-            memcpy(return_label, return_prefix, 5);
-            memcpy(return_label + 5, block_tag, block_tag_length);
-            return_label[length - 1] = 0;
+            memcpy(return_label, return_prefix, 4);
+            memcpy(return_label + 4, block_tag, block_tag_length);
 
             add_block(builder, return_label);
 

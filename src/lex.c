@@ -1,11 +1,9 @@
 #include "lex.h"
 #include "util.h"
-
 #include <stdlib.h>
 #include <string.h>
 
 #define LEX_BUF_SZ              4096
-#define TOKEN_STREAM_CAPACITY   1024
 
 enum { END_OF_BUF = 0, END_OF_FILE };
 

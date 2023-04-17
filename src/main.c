@@ -2,7 +2,6 @@
 #include "parse.h"
 #include "ir.h"
 #include "symbols.h"
-#include "compile.h"
 #include "util.h"
 #include "vector.h"
 #include <stdbool.h>
