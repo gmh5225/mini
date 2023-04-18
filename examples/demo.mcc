@@ -1,0 +1,58 @@
+// Imports and scope resolution via `::` operator
+import fmt::println;
+import math::sqrt;
+
+// Macro that generates the `Debug` interface for this struct.
+#[impl(Debug)]
+struct Point2D
+{
+    int x;
+    int y;
+};
+
+int Point2D::Euclidean(const Point2D *other) const
+{
+    // The `.` operator automatically dereferences the pointer
+    auto dx = (other.x - self.x) ** 2;
+    auto dy = (other.y - self.y) ** 2;
+    return sqrt(dx + dy);
+}
+
+// The above method is syntactic sugar for the following function:
+int point2d_euclidean(const Point2D *self, const Point2D *other) { ... }
+
+enum Color : u8
+{
+    Red,
+    Green,
+    Blue,
+};
+
+interface Greeter
+{
+    void greet() const;
+};
+
+struct Person : Greeter
+{
+    String name;
+    u8     age;
+    Color  favorite_color;
+};
+
+// Fulfills the Greeter interface
+void Person::greet() const
+{
+    println("Hello, my name is {}. I'm {} years old, and my favorite color is {}.",
+        self.name, self.age, self.favorite_color);
+}
+
+int main(int argc, char **argv)
+{
+    // `auto` keyword infers the type of the variable from the assignment expression
+    auto p1 = Point2D{x: 1, y: 2};
+    auto p2 = Point2D{x: 3, y: 4};
+    auto dist = p1.Euclidean(p2);
+    println("Distance between {} and {} = {}", p1, p2, dist);
+    return 0;
+}

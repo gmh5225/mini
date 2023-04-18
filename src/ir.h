@@ -1,5 +1,5 @@
-#ifndef MINI_IR_H
-#define MINI_IR_H
+#ifndef MCC_IR_H
+#define MCC_IR_H
 
 #include "parse.h"
 #include "table.h"
@@ -9,7 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Mini Intermediate Representation */
+/* MCC Intermediate Representation */
 
 typedef enum OpCode OpCode;
 typedef enum OperandKind OperandKind;

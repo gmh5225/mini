@@ -18,17 +18,17 @@ enum
     DUMP_IR = 1 << 4,
 };
 
-typedef struct MiniOpts MiniOpts;
-struct MiniOpts
+typedef struct MCCOpts MCCOpts;
+struct MCCOpts
 {
     int dump_flags;
     char *input_filename;
     char *output_filename;
 };
 
-MiniOpts parse_mini_options(int argc, char **argv)
+MCCOpts parse_mcc_options(int argc, char **argv)
 {
-    MiniOpts opts = {
+    MCCOpts opts = {
         .dump_flags = 0,
         .input_filename = NULL,
         .output_filename = "a.out",
@@ -81,7 +81,7 @@ MiniOpts parse_mini_options(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-    MiniOpts opts = parse_mini_options(argc, argv);
+    MCCOpts opts = parse_mcc_options(argc, argv);
     srand(time(NULL));
 
     FILE *file = fopen(opts.input_filename, "rb");

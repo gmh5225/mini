@@ -1,5 +1,5 @@
-#ifndef MINI_VECTOR_H 
-#define MINI_VECTOR_H
+#ifndef MCC_VECTOR_H 
+#define MCC_VECTOR_H
 
 #include <stddef.h>
 

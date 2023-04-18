@@ -1,4 +1,4 @@
-TARGET = mini
+TARGET = mcc
 
 SRC_DIR = src
 INC_DIR	= include

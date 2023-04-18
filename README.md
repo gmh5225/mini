@@ -1,4 +1,4 @@
-# mini
+# mcc - MagicC Compiler
 
 A compiler for a statically & strongly typed, C-like programming language.
 This is a research project designed to explore all aspects of compiler design.

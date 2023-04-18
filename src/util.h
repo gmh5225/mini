@@ -1,5 +1,5 @@
-#ifndef MINI_UTIL_H
-#define MINI_UTIL_H
+#ifndef MCC_UTIL_H
+#define MCC_UTIL_H
 
 #include "lex.h"
 
