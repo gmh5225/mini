@@ -1,5 +1,5 @@
-#ifndef MCC_CODEGEN_H
-#define MCC_CODEGEN_H
+#ifndef MINI_CODEGEN_H
+#define MINI_CODEGEN_H
 
 #include "ir.h"
 #include "parse.h"

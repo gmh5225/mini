@@ -1,5 +1,5 @@
-#ifndef MCC_LEX_H
-#define MCC_LEX_H
+#ifndef MINI_LEX_H
+#define MINI_LEX_H
 
 #include "vector.h"
 

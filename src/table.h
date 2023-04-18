@@ -1,5 +1,5 @@
-#ifndef MCCUTILS_TABLE_H
-#define MCCUTILS_TABLE_H
+#ifndef MINI_TABLE_H 
+#define MINI_TABLE_H
 
 #define TABLE_SIZE 1024
 

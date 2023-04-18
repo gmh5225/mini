@@ -1,5 +1,5 @@
-#ifndef MCC_TYPES_H
-#define MCC_TYPES_H
+#ifndef MINI_TYPES_H
+#define MINI_TYPES_H
 
 #include <stdbool.h>
 

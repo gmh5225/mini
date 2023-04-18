@@ -1,5 +1,5 @@
-#ifndef MCC_SYMBOLS_H
-#define MCC_SYMBOLS_H
+#ifndef MINI_SYMBOLS_H
+#define MINI_SYMBOLS_H
 
 #include "types.h"
 

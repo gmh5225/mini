@@ -4,7 +4,7 @@
 
 void error(const char *fmt, ...)
 {
-    fprintf(stderr, "mcc: ");
+    fprintf(stderr, "mini: ");
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
@@ -15,7 +15,7 @@ void error(const char *fmt, ...)
 
 void error_at(int line, int col, const char *fmt, ...)
 {
-    fprintf(stderr, "mcc: at line %d, col %d:\n ", line, col);
+    fprintf(stderr, "mini: at line %d, col %d:\n ", line, col);
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
@@ -26,7 +26,7 @@ void error_at(int line, int col, const char *fmt, ...)
 
 void error_at_token(Token *t, const char *fmt, ...)
 {
-    fprintf(stderr, "mcc: at line %d, col %d: on token %s\n ",
+    fprintf(stderr, "mini: at line %d, col %d: on token %s\n ",
             t->line, t->col, (t->kind == TOKEN_IDENTIFIER)
                 ? t->str.data
                 : token_as_str(t->kind));

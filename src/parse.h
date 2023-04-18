@@ -1,5 +1,5 @@
-#ifndef MCC_PARSE_H
-#define MCC_PARSE_H
+#ifndef MINI_PARSE_H
+#define MINI_PARSE_H
 
 #include "lex.h"
 #include "types.h"
