@@ -191,7 +191,7 @@ static void emit(IRBuilder *builder, ASTNode *node)
             add_instruction(builder, inst);
             break;
         case NODE_COND_STMT:
-            error("conditional translation to IR are not implemented yet");
+            error("conditional translations to IR are not implemented yet");
             break;
         case NODE_RET_STMT:
             const char *return_prefix = "ret."; // length 4
