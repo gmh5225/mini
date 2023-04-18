@@ -1,25 +1,22 @@
-// Imports and scope resolution via `::` operator
+// Imports and namespace resolution via `::` operator
 import fmt::println;
 import math::sqrt;
 
-// Macro that generates the `Debug` interface for this struct.
-#[impl(Debug)]
 struct Point2D
 {
-    int x;
-    int y;
+    x: int;
+    y: int;
 };
 
-int Point2D::Euclidean(const Point2D *other) const
-{
+func Point2D::Euclidean(self, const other: *Point2D) -> int {
     // The `.` operator automatically dereferences the pointer
-    auto dx = (other.x - self.x) ** 2;
-    auto dy = (other.y - self.y) ** 2;
+    dx := (other.x - self.x) ** 2;
+    dy := (other.y - self.y) ** 2;
     return sqrt(dx + dy);
 }
 
 // The above method is syntactic sugar for the following function:
-int point2d_euclidean(const Point2D *self, const Point2D *other) { ... }
+func point2d_euclidean(const self: *Point2D, const other: *Point2D) -> int { ... }
 
 enum Color : u8
 {
@@ -30,29 +27,27 @@ enum Color : u8
 
 interface Greeter
 {
-    void greet() const;
+    func greet();
 };
 
-struct Person : Greeter
+struct Person
 {
-    String name;
-    u8     age;
-    Color  favorite_color;
+    name: String;
+    age: u8;
+    favorite_color: Color;
 };
 
 // Fulfills the Greeter interface
-void Person::greet() const
-{
+func Person::greet() {
     println("Hello, my name is {}. I'm {} years old, and my favorite color is {}.",
         self.name, self.age, self.favorite_color);
 }
 
-int main(int argc, char **argv)
-{
+func main() {
     // `auto` keyword infers the type of the variable from the assignment expression
-    auto p1 = Point2D{x: 1, y: 2};
-    auto p2 = Point2D{x: 3, y: 4};
-    auto dist = p1.Euclidean(p2);
+    p1 := Point2D{x: 1, y: 2};
+    p2 := Point2D{x: 3, y: 4};
+    dist := p1.Euclidean(p2);
     println("Distance between {} and {} = {}", p1, p2, dist);
     return 0;
 }

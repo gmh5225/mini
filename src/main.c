@@ -86,7 +86,7 @@ int main(int argc, char **argv)
 
     FILE *file = fopen(opts.input_filename, "rb");
     if (!file) {
-        error("couldn't open file `%s`", file);
+        error("couldn't open file `%s`", opts.input_filename);
     }
 
     init_global_scope();

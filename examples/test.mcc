@@ -1,16 +1,14 @@
-const bool foo = false;
+const foo: bool = false;
 
-int add_two(int x, int y)
-{
+func add_two(x: int, y: int) -> int {
     return x + y;
 }
 
 // This is a comment
-int main(int argc, char **argv)
-{
-    auto x = -1;
-    auto y = 2;
-    auto z = 3;
-    auto num = x + y * z;
+func main() {
+    x := -1;
+    y := 2;
+    z := 3;
+    num := x + y * z;
     return num;
 }

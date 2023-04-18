@@ -14,9 +14,9 @@ enum TokenKind
     TOKEN_UNKNOWN = 0, // Misc
     TOKEN_EOF,
     TOKEN_CONST, // Keywords
-    TOKEN_FUNC,
     TOKEN_RETURN,
-    TOKEN_USE,
+    TOKEN_FUNC,
+    TOKEN_IMPORT,
     TOKEN_STRUCT,
     TOKEN_ENUM,
     TOKEN_IF,
@@ -24,7 +24,7 @@ enum TokenKind
     TOKEN_ELSE,
     TOKEN_TRUE,
     TOKEN_FALSE,
-    TOKEN_INT, // Primitive types
+    TOKEN_INT,    // Primitive types
     TOKEN_BOOL,
     TOKEN_WALRUS, // Operators
     TOKEN_EQUAL,
@@ -47,6 +47,7 @@ enum TokenKind
     TOKEN_RBRACKET,
     TOKEN_SEMICOLON,
     TOKEN_COLON,
+    TOKEN_DOUBLE_COLON,
     TOKEN_DOT,
     TOKEN_COMMA,
     TOKEN_ARROW,

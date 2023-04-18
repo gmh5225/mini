@@ -1,7 +1,6 @@
-int main(int argc, char **argv)
-{
-    auto x = -1;
-    auto y = 0;
+func main() -> int {
+    x := -1;
+    y := 0;
 
     if x > 0 {
         y = 42;
