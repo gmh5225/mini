@@ -194,15 +194,6 @@ static void emit(IRBuilder *builder, ASTNode *node)
             error("conditional translations to IR are not implemented yet");
             break;
         case NODE_RET_STMT:
-            const char *return_prefix = "ret."; // length 4
-            char *block_tag = builder->current_block->tag;
-            size_t block_tag_length = strlen(block_tag);
-
-            size_t length = 4 + block_tag_length + 1;
-            char *return_label = calloc(length, sizeof(char));
-            memcpy(return_label, return_prefix, 4);
-            memcpy(return_label + 4, block_tag, block_tag_length);
-
             inst = make_instruction(OP_RET);
 
             if (is_compound(node->ret_stmt.value)) {
@@ -228,7 +219,6 @@ static void emit(IRBuilder *builder, ASTNode *node)
 
             inst->num_operands = 1;
 
-            add_block(builder, return_label);
             add_instruction(builder, inst);
             break;
         case NODE_UNARY_EXPR:

@@ -248,6 +248,8 @@ static Type parse_type()
 
 static ASTNode *parse_variable_declaration(char *var_name)
 {
+    int line = tok()->line;
+    int col = tok()->col;
     // Check if the variable is a constant and parse identifier if not yet parsed
     bool is_constant = false;
     if (!var_name) {
@@ -282,6 +284,9 @@ static ASTNode *parse_variable_declaration(char *var_name)
             node->var_decl.init = parse_expression();
             var_sym->type = node->var_decl.init->type;
             var_sym->is_initialized = true;
+        } else {
+            LOG_WARN("uninitialized variable `%s` on line %d, col %d",
+                    node->var_decl.name, line, col);
         }
     }
 
@@ -335,6 +340,7 @@ static ASTNode *parse_block(in_func_toplevel)
                         stmt = parse_function_call(identifier);
                         break;
                     case TOKEN_WALRUS:
+                    case TOKEN_COLON:
                         stmt = parse_variable_declaration(identifier);
                         break;
                     case TOKEN_EQUAL:
