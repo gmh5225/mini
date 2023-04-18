@@ -72,9 +72,10 @@ struct UnaryExpr
     ASTNode *expr;
 };
 
+// NOTE: The order of these matter
 enum BinaryOp
 {
-    BIN_UNKNOWN,
+    BIN_UNKNOWN = 0,
     BIN_ADD,
     BIN_SUB,
     BIN_MUL,
@@ -102,6 +103,7 @@ union Literal
     double d_val;
     char c_val;
     bool b_val;
+    size_t size;
     struct {
         char *s_val;
         size_t s_len;

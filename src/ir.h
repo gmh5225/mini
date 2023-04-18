@@ -37,12 +37,10 @@ struct Program
     int num_blocks;
 };
 
+// NOTE: The order of these matter
 enum OpCode
 {
-    OP_UNKNOWN,
-    OP_DEF,
-    OP_ALLOC,
-    OP_STORE,
+    OP_UNKNOWN     = 0,
     OP_ADD         = BIN_ADD,
     OP_SUB         = BIN_SUB,
     OP_MUL         = BIN_MUL,
@@ -55,6 +53,9 @@ enum OpCode
     OP_CMP_GT      = BIN_CMP_GT,
     OP_CMP_LT_EQ   = BIN_CMP_LT_EQ,
     OP_CMP_GT_EQ   = BIN_CMP_GT_EQ,
+    OP_DEF,
+    OP_LOAD,
+    OP_STORE,
     OP_JMP,
     OP_BR,
     OP_RET,

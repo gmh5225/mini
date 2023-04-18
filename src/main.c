@@ -14,7 +14,8 @@ enum
 { 
     DUMP_TOKENS = 1 << 1, 
     DUMP_AST = 1 << 2,
-    DUMP_IR = 1 << 3,
+    DUMP_SYMBOLS = 1 << 3,
+    DUMP_IR = 1 << 4,
 };
 
 typedef struct MiniOpts MiniOpts;
@@ -48,17 +49,22 @@ MiniOpts parse_mini_options(int argc, char **argv)
             continue;
         }
 
-        if (strcmp(arg, "-T") == 0) {
+        if (strcmp(arg, "-dT") == 0) {
             opts.dump_flags |= DUMP_TOKENS;
             continue;
         }
 
-        if (strcmp(arg, "-A") == 0) {
+        if (strcmp(arg, "-dA") == 0) {
             opts.dump_flags |= DUMP_AST;
             continue;
         }
 
-        if (strcmp(arg, "-IR") == 0) {
+        if (strcmp(arg, "-dSY") == 0) {
+            opts.dump_flags |= DUMP_SYMBOLS;
+            continue;
+        }
+
+        if (strcmp(arg, "-dIR") == 0) {
             opts.dump_flags |= DUMP_IR;
             continue;
         }
@@ -98,6 +104,9 @@ int main(int argc, char **argv)
     ASTNode *ast = parse(tokens);
     if (opts.dump_flags & DUMP_AST) {
         dump_ast(ast, 0);
+    }
+
+    if (opts.dump_flags & DUMP_SYMBOLS) {
         symbol_table_dump(global_scope, 0);
     }
 
@@ -105,11 +114,17 @@ int main(int argc, char **argv)
     if (opts.dump_flags & DUMP_IR) {
         BasicBlock *block = program.blocks;
         while (block) {
-            printf("[BasicBlock %s#%d]\n", block->tag, block->id);
-            printf("  %ld predecessors, %ld successors, %ld instructions\n",
-                    block->predecessors.size, 
+            printf("[BasicBlock %s#%d] (%ld predecessors, %ld successors, %ld instructions)\n",
+                    block->tag, block->id,
+                    block->predecessors.size,
                     block->successors.size,
                     block->instructions.size);
+
+            for (size_t i = 0; i < block->instructions.size; i++) {
+                Instruction *inst = (Instruction *)vector_get(&block->instructions, i);
+                dump_instruction(inst);
+            }
+
             block = block->next;
         }
     }
