@@ -18,12 +18,8 @@ void fold_constants(ASTNode *node)
             AssignStmt assign = node->assign;
             if (assign.value->kind == NODE_REF_EXPR && 
                     strcmp(assign.name, assign.value->ref) == 0) {
-
-#ifdef DEBUG
                 LOG_INFO("elminiating self-assignment of variable `%s` on line %d, col %d",
                         assign.name, node->line, node->col);
-#endif
-
                 node->kind = NODE_NOOP;
                 free(assign.value);
             }

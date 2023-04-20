@@ -1,4 +1,5 @@
 #include "parse.h"
+#include "compile.h"
 #include "symbols.h"
 #include "util.h"
 #include <stdio.h>
@@ -42,6 +43,7 @@ static ASTNode *make_node(NodeKind kind)
     ASTNode *node = calloc(1, sizeof(struct ASTNode));
     node->kind = kind;
     node->visited = false;
+    node->type = primitive_types[TYPE_VOID];
     return node;
 }
 
@@ -75,6 +77,7 @@ static ASTNode *parse_block(bool);
 static ASTNode *parse_unary_expr(char un_op, int line, int col)
 {
     ASTNode *node = make_node(NODE_UNARY_EXPR);
+    node->line = line; node->col = col;
     node->unary.un_op = un_op;
     node->unary.expr = pop_expr_node();
     node->type = node->unary.expr->type;
@@ -84,6 +87,7 @@ static ASTNode *parse_unary_expr(char un_op, int line, int col)
 static ASTNode *parse_binary_expr(char bin_op, int line, int col)
 {
     ASTNode *node = make_node(NODE_BINARY_EXPR);
+    node->line = line; node->col = col;
     node->binary.bin_op = bin_op;
 
     node->binary.lhs = pop_expr_node();
@@ -347,7 +351,7 @@ static ASTNode *parse_function_call(char *func_name)
     return NULL;
 }
 
-static ASTNode *parse_block(in_func_toplevel)
+static ASTNode *parse_block(bool in_func_toplevel)
 {
     expect(TOKEN_LBRACE);
 
@@ -650,4 +654,56 @@ void dump_literal(Literal literal)
             break;
         default: error("invalid Literal! (%d)", literal.kind);
     }
+}
+
+char *copy_literal_bytes(Literal *literal, size_t *size)
+{
+    char *bytes = NULL;
+    size_t bytes_size = 0;
+
+    switch (literal->kind) {
+        case L_INT:
+            bytes_size += sizeof(intmax_t);
+            bytes = calloc(bytes_size, sizeof(char));
+            memcpy(bytes, &literal->i_val, bytes_size);
+            break;
+        case L_UINT:
+            bytes_size += sizeof(uintmax_t);
+            bytes = calloc(bytes_size, sizeof(char));
+            memcpy(bytes, &literal->u_val, bytes_size);
+            break;
+        case L_FLOAT:
+            bytes_size += sizeof(float);
+            bytes = calloc(bytes_size, sizeof(char));
+            memcpy(bytes, &literal->f_val, bytes_size);
+            break;
+        case L_DOUBLE:
+            bytes_size += sizeof(double);
+            bytes = calloc(bytes_size, sizeof(char));
+            memcpy(bytes, &literal->d_val, bytes_size);
+            break;
+        case L_CHAR:
+            bytes_size += sizeof(char);
+            bytes = calloc(bytes_size, sizeof(char));
+            memcpy(bytes, &literal->c_val, bytes_size);
+            break;
+        case L_BOOL:
+            bytes_size += sizeof(bool);
+            bytes = calloc(bytes_size, sizeof(char));
+            memcpy(bytes, &literal->b_val, bytes_size);
+            break;
+        case L_STRING:
+            bytes_size += literal->s_len;
+            bytes = calloc(bytes_size, sizeof(char));
+            memcpy(bytes, literal->s_val, bytes_size);
+            break;
+        case L_SIZE:
+            bytes_size += sizeof(size_t);
+            bytes = calloc(bytes_size, sizeof(char));
+            memcpy(bytes, &literal->size, bytes_size);
+            break;
+    }
+
+    *size = bytes_size;
+    return bytes;
 }

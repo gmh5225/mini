@@ -25,7 +25,7 @@ void table_insert(Table *table, const char *key, void *value)
 
     size_t key_length = strlen(key);
     TableEntry *new_entry = calloc(1, sizeof(TableEntry));
-    new_entry->key = calloc(key_length, sizeof(char));
+    new_entry->key = calloc(key_length + 1, sizeof(char));
     memcpy(new_entry->key, key, key_length);
     new_entry->value = value;
     new_entry->next = table->entries[index];

@@ -126,6 +126,9 @@ struct Literal
     };
 };
 
+void dump_literal(Literal literal);
+char *copy_literal_bytes(Literal *literal, size_t *size);
+
 enum NodeKind
 {
     NODE_UNKNOWN,
@@ -165,6 +168,5 @@ struct ASTNode
 
 ASTNode *parse(Vector tokens);
 void dump_ast(ASTNode *program, int level);
-void dump_literal(Literal literal);
 
 #endif

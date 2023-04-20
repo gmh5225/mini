@@ -5,33 +5,24 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 typedef struct IRBuilder IRBuilder;
 struct IRBuilder
 {
-    bool in_condition;
-    bool in_compound;
-    bool in_assignment;
-    Instruction *prev_inst;
-    Instruction *curr_inst;
     Table *var_names;
-    Table *versions;
+    Table *expressions;
     BasicBlock *blocks;
     BasicBlock *current_block;
     int block_count;
 };
 
 static ASTNode *emit(IRBuilder *, ASTNode *);
+static void add_operand(Instruction *, void *, OperandKind);
 
 /* IRBuilder */
 static void ir_builder_init(IRBuilder *builder)
 {
-    builder->in_condition = false;
-    builder->in_compound = false;
-    builder->in_assignment = false;
-    builder->prev_inst = builder->curr_inst = NULL;
     builder->var_names = table_new();
-    builder->versions = table_new();
+    builder->expressions = table_new();
     builder->blocks = builder->current_block = NULL;
     builder->block_count = 0;
 }
@@ -79,11 +70,72 @@ static void add_block(IRBuilder *builder, char *tag)
     builder->current_block = builder->current_block->next;
 }
 
+static char *encode_instruction(IRBuilder *builder, Instruction *inst)
+{
+    size_t capacity = 16;
+    char *encoded = calloc(capacity, sizeof(char));
+    size_t size = 0;
+
+    for (size_t i = 0; i < inst->num_operands; i++) {
+        Operand operand = inst->operands[i];
+        switch (operand.kind) {
+            case OPERAND_LITERAL:
+                size_t literal_bytes_size = 0;
+                char *literal_bytes = copy_literal_bytes(&operand.literal, &literal_bytes_size);
+                if (size + literal_bytes_size >= capacity) {
+                    capacity += literal_bytes_size + 1;
+                    void *tmp = realloc(encoded, capacity * sizeof(char));
+                    encoded = tmp;
+                }
+                memcpy(encoded + size, literal_bytes, literal_bytes_size);
+                size += literal_bytes_size;
+                break;
+            case OPERAND_VARIABLE:
+                size_t var_name_size = strlen(operand.var);
+                if (size + var_name_size >= capacity) {
+                    capacity += var_name_size + 1;
+                    void *tmp = realloc(encoded, capacity * sizeof(char));
+                    encoded = tmp;
+                }
+                memcpy(encoded + size, operand.var, var_name_size);
+                size += var_name_size;
+                break;
+            default: error("cannot encode invalid OperandKind: %d", operand.kind);
+        }
+    }
+    encoded[size] = 0;
+
+#ifdef DEBUG
+    printf("Encoded TAC: ");
+    for (size_t i = 0; i < size; i++) {
+        printf("%X ", encoded[i]);
+    }
+    printf("\n");
+#endif
+
+    return encoded;
+}
+
 static void add_instruction(IRBuilder *builder, Instruction *inst)
 {
     BasicBlock *current_block = builder->current_block;
     if (!current_block)
         error("no block to add instruction to");
+
+    if (inst->assignee) {
+        char *encoded = encode_instruction(builder, inst);
+        char *exists = (char *)table_lookup(builder->expressions, encoded);
+        if (exists) {
+            LOG_INFO("eliminating redundant calculation for variable `%s`",
+                    inst->assignee);
+            inst->opcode = OP_ASSIGN;
+            memset(inst->operands, 0, sizeof(Operand) * MAX_OPERANDS);
+            inst->num_operands = 0;
+            add_operand(inst, exists, OPERAND_VARIABLE);
+        } else {
+            table_insert(builder->expressions, encoded, inst->assignee);
+        }
+    }
 
     vector_push_back(&current_block->instructions, inst);
 }

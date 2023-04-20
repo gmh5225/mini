@@ -2,8 +2,7 @@
 import fmt::println;
 import math::sqrt;
 
-struct Point2D
-{
+struct Point2D {
     x: int;
     y: int;
 };
@@ -18,20 +17,17 @@ func Point2D::Euclidean(self, const other: *Point2D) -> int {
 // The above method is syntactic sugar for the following function:
 func point2d_euclidean(const self: *Point2D, const other: *Point2D) -> int { ... }
 
-enum Color : u8
-{
+enum Color : u8 {
     Red,
     Green,
     Blue,
 };
 
-interface Greeter
-{
+interface Greeter {
     func greet();
 };
 
-struct Person
-{
+struct Person {
     name: String;
     age: u8;
     favorite_color: Color;

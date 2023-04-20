@@ -1,14 +1,11 @@
 #include "symbols.h"
 #include "types.h"
 #include "util.h"
-
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-SymbolTable *global_scope = NULL;
 
 const char *symbol_strings[] = {
     [SYMBOL_UNKNOWN] = "[UNKNOWN SYMBOL]",
@@ -18,21 +15,6 @@ const char *symbol_strings[] = {
 };
 
 const char *symbol_as_str(SymbolKind type) { return symbol_strings[type]; }
-
-void init_global_scope()
-{
-    global_scope = symbol_table_create("__GLOBAL__");
-    if (!global_scope) {
-        error("couldn't allocate symbol table for global_scope!");
-    }
-
-    // Add supported primitive types to global scope
-    for (TypeKind kind = TYPE_VOID; kind <= TYPE_BOOL; kind++) {
-        Type primitive = primitive_types[kind];
-        Symbol *primitive_sym = symbol_table_insert(global_scope, primitive.name, SYMBOL_TYPE);
-        primitive_sym->type = primitive;
-    }
-}
 
 static Symbol *symbol_info_create(void)
 {

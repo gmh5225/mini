@@ -1,6 +1,7 @@
 #include "symbols.h"
 #include "types.h"
 #include "codegen.h"
+#include "compile.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
