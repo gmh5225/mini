@@ -10,8 +10,7 @@
 
 SymbolTable *global_scope = NULL;
 
-const char *symbol_strings[] =
-{
+const char *symbol_strings[] = {
     [SYMBOL_UNKNOWN] = "[UNKNOWN SYMBOL]",
     [SYMBOL_VARIABLE] = "[VARIABLE]",
     [SYMBOL_FUNCTION] = "[FUNCTION]",
@@ -40,7 +39,7 @@ static Symbol *symbol_info_create(void)
     Symbol *s = malloc(sizeof(Symbol));
     s->kind = SYMBOL_UNKNOWN;
     s->next = NULL;
-    s->type = (Type){.kind = TYPE_UNKNOWN};
+    s->node = NULL;
     s->name = NULL;
     s->is_constant = false;
     s->is_initialized = false;

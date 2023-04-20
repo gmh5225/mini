@@ -28,6 +28,8 @@ struct Type
     bool is_pointer;
 };
 
+bool types_equal(Type a, Type b);
+
 extern const Type primitive_types[];
 
 #endif

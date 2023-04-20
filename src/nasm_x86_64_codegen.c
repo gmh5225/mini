@@ -40,8 +40,7 @@ struct Register
 
 #define NUM_REGISTERS R_R12 + 1
 
-static const Register registers_nasm_x86_64[] =
-{
+static const Register registers_nasm_x86_64[] = {
     [R_RAX] = { R_RAX, "rax", false, false },
     [R_RBX] = { R_RBX, "rbx", true, false },
     [R_RCX] = { R_RCX, "rcx", false, false },
@@ -116,8 +115,7 @@ enum
     DZ = 64,
 };
 
-const char *data_alloc_directive[] =
-{
+const char *data_alloc_directive[] = {
     [DB] = "db",
     [DW] = "dw",
     [DD] = "dd",
@@ -134,8 +132,7 @@ enum
     RESQ = 8,
 };
 
-const char *bss_alloc_directive[] =
-{
+const char *bss_alloc_directive[] = {
     [RESB] = "resb",
     [RESD] = "resd",
     [RESQ] = "resq",

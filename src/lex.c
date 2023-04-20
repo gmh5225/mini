@@ -7,8 +7,7 @@
 
 enum { END_OF_BUF = 0, END_OF_FILE };
 
-const char *token_strings[] =
-{
+const char *token_strings[] = {
     [TOKEN_UNKNOWN] = "[UNKNOWN]",
     [TOKEN_EOF] = "[EOF]",
     [TOKEN_CONST] = "const",

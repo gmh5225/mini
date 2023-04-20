@@ -41,12 +41,14 @@ struct Program
 enum OpCode
 {
     OP_UNKNOWN     = 0,
+    OP_NEG         = UN_NEG,
+    OP_NOT         = UN_NOT,
+    OP_DEREF       = UN_DEREF,
+    OP_ADDR        = UN_ADDR,
     OP_ADD         = BIN_ADD,
     OP_SUB         = BIN_SUB,
     OP_MUL         = BIN_MUL,
     OP_DIV         = BIN_DIV,
-    OP_NEG         = UN_NEG,
-    OP_NOT         = UN_NOT,
     OP_CMP         = BIN_CMP,
     OP_CMP_NOT     = BIN_CMP_NOT,
     OP_CMP_LT      = BIN_CMP_LT,
@@ -54,8 +56,7 @@ enum OpCode
     OP_CMP_LT_EQ   = BIN_CMP_LT_EQ,
     OP_CMP_GT_EQ   = BIN_CMP_GT_EQ,
     OP_DEF,
-    OP_LOAD,
-    OP_STORE,
+    OP_ASSIGN,
     OP_JMP,
     OP_BR,
     OP_RET,
@@ -65,30 +66,30 @@ enum OperandKind
 {
     OPERAND_UNKNOWN,
     OPERAND_LITERAL,
-    OPERAND_TYPE,
-    OPERAND_REGISTER,
+    OPERAND_VARIABLE,
     OPERAND_LABEL,
 };
 
 struct Operand
 {
     OperandKind kind;
+    Type type;
     union
     {
         Literal literal;
-        Type type;
-        char *reg_name;
-        char *label_name;
+        char *var;
+        char *label;
     };
 };
 
-#define MAX_OPERANDS 4
+#define MAX_OPERANDS 2
 
 struct Instruction
 {
     OpCode opcode;
+    char *assignee;
     Operand operands[MAX_OPERANDS];
-    size_t num_operands;
+    uint8_t num_operands;
 };
 
 Program emit_ir(ASTNode *root);

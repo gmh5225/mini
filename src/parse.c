@@ -1,9 +1,9 @@
 #include "parse.h"
 #include "symbols.h"
 #include "util.h"
-
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static SymbolTable *current_scope;  // The current scope of the parser
 static Vector stream;               // The stream of tokens to parse
@@ -41,6 +41,7 @@ static ASTNode *make_node(NodeKind kind)
 {
     ASTNode *node = calloc(1, sizeof(struct ASTNode));
     node->kind = kind;
+    node->visited = false;
     return node;
 }
 
@@ -71,15 +72,16 @@ static void parse_factor();
 static void parse_term();
 static ASTNode *parse_block(bool);
 
-static ASTNode *parse_unary_expr(char un_op)
+static ASTNode *parse_unary_expr(char un_op, int line, int col)
 {
     ASTNode *node = make_node(NODE_UNARY_EXPR);
     node->unary.un_op = un_op;
     node->unary.expr = pop_expr_node();
+    node->type = node->unary.expr->type;
     return node;
 }
 
-static ASTNode *parse_binary_expr(char bin_op)
+static ASTNode *parse_binary_expr(char bin_op, int line, int col)
 {
     ASTNode *node = make_node(NODE_BINARY_EXPR);
     node->binary.bin_op = bin_op;
@@ -88,13 +90,14 @@ static ASTNode *parse_binary_expr(char bin_op)
     parse_term();
     node->binary.rhs = pop_expr_node();
 
-    // TODO: add typechecking here
-    //type lhs_type = node->binary.lhs->type;
-    //type rhs_type = node->binary.rhs->type;
-    //if (!types_equal(lhs_type, rhs_type)) {
-    //    error_at_token(tokens, "type mismatch in binary expression");
-    //}
+    Type lhs_type = node->binary.lhs->type;
+    Type rhs_type = node->binary.rhs->type;
+    if (!types_equal(lhs_type, rhs_type)) {
+        error_at(line, col, "type mismatch in binary expression\n"
+            "LHS(%s) != RHS(%s)", lhs_type.name, rhs_type.name);
+    }
 
+    node->type = node->binary.lhs->type;
     return node;
 }
 
@@ -118,11 +121,13 @@ static void parse_factor()
             // TODO: Infer type from number here.
             // For now, we just assume its an `int`
             node->type = primitive_types[TYPE_INT];
+            node->literal.kind = L_INT;
             node->literal.i_val = consume()->i_val;
             break;
         case TOKEN_TRUE:
         case TOKEN_FALSE:
             node->type = primitive_types[TYPE_BOOL];
+            node->literal.kind = L_BOOL;
             node->literal.b_val = consume()->b_val;
             break;
         default:
@@ -137,6 +142,8 @@ void parse_term()
 {
     parse_factor();
     for (;;) {
+        int line = tok()->line;
+        int col = tok()->col;
         BinaryOp bin_op = BIN_UNKNOWN;
         switch (tok()->kind) {
             case TOKEN_STAR: 
@@ -149,12 +156,14 @@ void parse_term()
         }
 
         if (bin_op == BIN_UNKNOWN) break;
-        push_expr_node(parse_binary_expr(bin_op));
+        push_expr_node(parse_binary_expr(bin_op, line, col));
     }
 }
 
 static ASTNode *parse_expression()
 {
+    int line = tok()->line;
+    int col = tok()->col;
     UnaryOp un_op = UN_UNKNOWN;
     switch (tok()->kind) {
         case TOKEN_MINUS: 
@@ -172,10 +181,12 @@ static ASTNode *parse_expression()
     parse_term();
 
     if (un_op != UN_UNKNOWN) {
-        push_expr_node(parse_unary_expr(un_op));
+        push_expr_node(parse_unary_expr(un_op, line, col));
     }
 
     for (;;) {
+        line = tok()->line;
+        col = tok()->col;
         BinaryOp bin_op = BIN_UNKNOWN;
         switch (tok()->kind) {
             case TOKEN_PLUS: 
@@ -206,7 +217,7 @@ static ASTNode *parse_expression()
         }
 
         if (bin_op == BIN_UNKNOWN) break;
-        push_expr_node(parse_binary_expr(bin_op));
+        push_expr_node(parse_binary_expr(bin_op, line, col));
     }
 
     return pop_expr_node();
@@ -271,8 +282,9 @@ static ASTNode *parse_variable_declaration(char *var_name)
 
     // Parse assignment and/or type declaration of variable
     if (match(TOKEN_WALRUS)) {
-        // num := -1 + 2 * 3
         node->var_decl.init = parse_expression();
+        // Infer type from expression
+        node->var_decl.type = node->var_decl.init->type; 
         var_sym->type = node->var_decl.init->type;
         var_sym->is_initialized = true;
     }
@@ -282,6 +294,14 @@ static ASTNode *parse_variable_declaration(char *var_name)
 
         if (match(TOKEN_EQUAL)) {
             node->var_decl.init = parse_expression();
+
+            Type decl_type = node->var_decl.type;
+            Type assign_type = node->var_decl.init->type;
+            if (!types_equal(decl_type, assign_type)) {
+                error_at(line, col, "variable assignment does not match variable type\n"
+                    "Variable(%s) != Assignment(%s)", decl_type.name, assign_type.name);
+            }
+
             var_sym->type = node->var_decl.init->type;
             var_sym->is_initialized = true;
         } else {
@@ -289,8 +309,11 @@ static ASTNode *parse_variable_declaration(char *var_name)
                     node->var_decl.name, line, col);
         }
     }
-
     expect(TOKEN_SEMICOLON);
+
+    // Set the pointer to the ASTNode for the symbol
+    var_sym->node = node;
+
     return node;
 }
 
@@ -309,6 +332,7 @@ static ASTNode *parse_variable_assignment(char *var_name)
     // TODO: add typechecking to see if expression matches declared type for var
 
     expect(TOKEN_SEMICOLON);
+
     return node;
 }
 
@@ -456,6 +480,8 @@ static ASTNode *parse_function_declaration()
     // Exit the function's scope
     exit_scope();
 
+    func_sym->node = node;
+
     return node;
 }
 
@@ -486,6 +512,13 @@ ASTNode *parse(Vector tokens)
         cur = cur->next = decl;
     }
 
+    // Do some checks here
+    Symbol *entry_point = symbol_table_lookup(global_scope, "main");
+    if (!entry_point || entry_point->kind != SYMBOL_FUNCTION) {
+        LOG_ERROR("no `main` function was found!");
+        error("failed to compile.");
+    }
+
     return ast.next;
 }
 
@@ -493,16 +526,14 @@ void dump_ast(ASTNode *root, int level)
 {
     if (!root) return;
 
-    static const char unary_ops[] = 
-    {
+    static const char unary_ops[] = {
         [UN_NEG] = '-',
         [UN_NOT] = '!',
         [UN_DEREF] = '*',
         [UN_ADDR] = '&',
     };
 
-    static const char *binary_ops[] =
-    {
+    static const char *binary_ops[] = {
         [BIN_ADD] = "+",
         [BIN_SUB] = "-",
         [BIN_MUL] = "*",
@@ -573,15 +604,7 @@ void dump_ast(ASTNode *root, int level)
             break;
         case NODE_LITERAL_EXPR:
             printf("[LITERAL]: value = ");
-            switch (root->type.kind) {
-                case TYPE_INT:
-                    printf("INT(%ld)", root->literal.i_val);
-                    break;
-                case TYPE_BOOL:
-                    printf("BOOL(%s)", root->literal.b_val ? "true" : "false");
-                    break;
-                default: error("invalid literal type!");
-            }
+            dump_literal(root->literal);
             printf("\n");
             break;
         case NODE_REF_EXPR:
@@ -591,4 +614,33 @@ void dump_ast(ASTNode *root, int level)
     }
 
     dump_ast(root->next, level);
+}
+
+void dump_literal(Literal literal)
+{
+    switch (literal.kind) {
+        case L_INT:
+            printf("%ld", literal.i_val);
+            break;
+        case L_UINT:
+        case L_SIZE:
+            printf("%ld", literal.u_val);
+            break;
+        case L_FLOAT:
+            printf("%f", literal.f_val);
+            break;
+        case L_DOUBLE:
+            printf("%g", literal.d_val);
+            break;
+        case L_CHAR:
+            printf("%c", literal.c_val);
+            break;
+        case L_BOOL:
+            printf("%s", literal.b_val ? "true" : "false");
+            break;
+        case L_STRING:
+            printf("%*s", (int)literal.s_len, literal.s_val);
+            break;
+        default: error("invalid Literal! (%d)", literal.kind);
+    }
 }

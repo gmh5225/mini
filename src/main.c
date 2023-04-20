@@ -1,6 +1,7 @@
 #include "lex.h"
 #include "parse.h"
 #include "ir.h"
+#include "optimize.h"
 #include "symbols.h"
 #include "util.h"
 #include "vector.h"
@@ -110,7 +111,10 @@ int main(int argc, char **argv)
         symbol_table_dump(global_scope, 0);
     }
 
-    Program program = emit_ir(ast);
+    fold_constants(ast);
+
+    Symbol *entry_point = symbol_table_lookup(global_scope, "main");
+    Program program = emit_ir(entry_point->node);
     if (opts.dump_flags & DUMP_IR) {
         BasicBlock *block = program.blocks;
         while (block) {

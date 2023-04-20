@@ -1,6 +1,7 @@
 #include "types.h"
 
 #include <stdint.h>
+#include <string.h>
 
 const Type primitive_types[] =
 {
@@ -47,3 +48,9 @@ const Type primitive_types[] =
         .size = sizeof(bool),
     },
 };
+
+bool types_equal(Type a, Type b)
+{
+    // TODO: Once we introduce unique Type IDs, we can simply just compare those
+    return memcmp(&a, &b, sizeof(Type)) == 0;
+}

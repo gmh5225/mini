@@ -4,7 +4,6 @@
 #include "lex.h"
 #include "types.h"
 #include "vector.h"
-
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -23,7 +22,8 @@ typedef enum BinaryOp BinaryOp;
 typedef struct UnaryExpr UnaryExpr;
 typedef struct BinaryExpr BinaryExpr;
 
-typedef union Literal Literal;
+typedef enum LiteralKind LiteralKind;
+typedef struct Literal Literal;
 
 struct FuncDecl
 {
@@ -59,8 +59,8 @@ struct CondStmt
 
 enum UnaryOp
 {
-    UN_UNKNOWN,
-    UN_NEG,
+    UN_UNKNOWN = 0,
+    UN_NEG     = 1,
     UN_NOT,
     UN_DEREF,
     UN_ADDR,
@@ -76,7 +76,7 @@ struct UnaryExpr
 enum BinaryOp
 {
     BIN_UNKNOWN = 0,
-    BIN_ADD,
+    BIN_ADD     = 5,
     BIN_SUB,
     BIN_MUL,
     BIN_DIV,
@@ -95,24 +95,41 @@ struct BinaryExpr
     ASTNode *rhs;
 };
 
-union Literal
+enum LiteralKind
 {
-    intmax_t i_val;
-    uintmax_t u_val;
-    float f_val;
-    double d_val;
-    char c_val;
-    bool b_val;
-    size_t size;
-    struct {
-        char *s_val;
-        size_t s_len;
+    L_INT,
+    L_UINT,
+    L_FLOAT,
+    L_DOUBLE,
+    L_CHAR,
+    L_BOOL,
+    L_STRING,
+    L_SIZE,
+};
+
+struct Literal
+{
+    LiteralKind kind;
+    union
+    {
+        intmax_t i_val;
+        uintmax_t u_val;
+        float f_val;
+        double d_val;
+        char c_val;
+        bool b_val;
+        struct {
+            char *s_val;
+            size_t s_len;
+        };
+        size_t size;
     };
 };
 
 enum NodeKind
 {
     NODE_UNKNOWN,
+    NODE_NOOP,
     NODE_FUNC_DECL,
     NODE_VAR_DECL,
     NODE_RET_STMT,
@@ -142,9 +159,11 @@ struct ASTNode
         Literal literal;
         char *ref;
     };
+    bool visited;
 };
 
 ASTNode *parse(Vector tokens);
 void dump_ast(ASTNode *program, int level);
+void dump_literal(Literal literal);
 
 #endif

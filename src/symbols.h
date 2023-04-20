@@ -1,6 +1,7 @@
 #ifndef MINI_SYMBOLS_H
 #define MINI_SYMBOLS_H
 
+#include "parse.h"
 #include "types.h"
 
 typedef enum SymbolKind SymbolKind;
@@ -19,11 +20,15 @@ typedef struct Symbol Symbol;
 struct Symbol
 {
     SymbolKind kind;
-    Symbol *next;
-    Type type;
     char *name;
     bool is_constant;
     bool is_initialized;
+    union 
+    {
+        Type type;
+        ASTNode *node;
+    };
+    Symbol *next;
 };
 
 #define SYMBOL_TABLE_SIZE 256

@@ -1,37 +1,44 @@
 #include "ir.h"
 #include "util.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+
 typedef struct IRBuilder IRBuilder;
 struct IRBuilder
 {
-    int in_condition;
-    int in_compound;
-    int in_assignment;
+    bool in_condition;
+    bool in_compound;
+    bool in_assignment;
     Instruction *prev_inst;
-    Table *register_names;
+    Instruction *curr_inst;
+    Table *var_names;
+    Table *versions;
     BasicBlock *blocks;
     BasicBlock *current_block;
     int block_count;
 };
 
+static ASTNode *emit(IRBuilder *, ASTNode *);
+
 /* IRBuilder */
 static void ir_builder_init(IRBuilder *builder)
 {
-    builder->in_condition = 0;
-    builder->in_compound = 0;
-    builder->in_assignment = 0;
-    builder->prev_inst = NULL;
-    builder->register_names = table_new();
+    builder->in_condition = false;
+    builder->in_compound = false;
+    builder->in_assignment = false;
+    builder->prev_inst = builder->curr_inst = NULL;
+    builder->var_names = table_new();
+    builder->versions = table_new();
     builder->blocks = builder->current_block = NULL;
     builder->block_count = 0;
 }
 
 static void ir_builder_free(IRBuilder *builder)
 {
-    table_free(builder->register_names);
+    table_free(builder->var_names);
 }
 
 static BasicBlock *make_basic_block(char *tag, int id)
@@ -81,258 +88,216 @@ static void add_instruction(IRBuilder *builder, Instruction *inst)
     vector_push_back(&current_block->instructions, inst);
 }
 
-static bool is_compound(ASTNode *node)
-{
-    if (node->kind == NODE_LITERAL_EXPR || node->kind == NODE_REF_EXPR)
-        return false;
-    return true;
-}
-
 static Instruction *previous_instruction(IRBuilder *builder)
 {
-    Instruction *previous = (Instruction *)vector_get(
-            &builder->current_block->instructions,
-            builder->current_block->instructions.size - 1
+    BasicBlock *current_block = builder->current_block;
+    if (!current_block)
+        error("no block to get previous instruction from");
+
+    Instruction *inst = (Instruction *)vector_get(
+            &current_block->instructions,
+            current_block->instructions.size - 1
             );
-    return previous;
+    return inst;
 }
 
-static void emit(IRBuilder *builder, ASTNode *node)
+static void add_operand(Instruction *inst, void *value, OperandKind kind)
 {
-    if (!node) return;
+    if (inst->num_operands == MAX_OPERANDS)
+        error("too many operands for instruction %d", inst->opcode);
 
+    Operand operand = { .kind = kind };
+    switch (operand.kind) {
+        case OPERAND_LITERAL:
+            operand.literal = *((Literal *)value);
+            break;
+        case OPERAND_VARIABLE:
+            operand.var = (char *)value;
+            break;
+        case OPERAND_LABEL:
+            operand.label = (char *)value;
+            break;
+        default: error("invalid OperandKind: %d", kind);
+    }
+
+    inst->operands[inst->num_operands++] = operand;
+}
+
+static void emit_function(IRBuilder *builder, FuncDecl func)
+{
+    add_block(builder, func.name);
+
+    Instruction *inst = make_instruction(OP_DEF);
+    add_operand(inst, func.name, OPERAND_LABEL);
+
+    add_instruction(builder, inst);
+
+    emit(builder, func.params);
+    emit(builder, func.body);
+}
+
+static void emit_variable(IRBuilder *builder, VarDecl var)
+{
+    Instruction *inst = make_instruction(OP_ASSIGN);
+    inst->assignee = var.name;
+
+    table_insert(builder->var_names, var.name, var.name);
+
+    switch (var.init->kind) {
+        case NODE_LITERAL_EXPR:
+            add_operand(inst, &var.init->literal, OPERAND_LITERAL);
+            break;
+        case NODE_REF_EXPR:
+            add_operand(inst, var.init->ref, OPERAND_VARIABLE);
+            break;
+        default:
+            emit(builder, var.init);
+            Instruction *temporary = previous_instruction(builder);
+            add_operand(inst, temporary->assignee, OPERAND_VARIABLE);
+    }
+
+    add_instruction(builder, inst);
+}
+
+static void emit_assignment(IRBuilder *builder, AssignStmt assign)
+{
+    Instruction *inst = make_instruction(OP_ASSIGN);
+    inst->assignee = assign.name;
+
+    switch (assign.value->kind) {
+        case NODE_LITERAL_EXPR:
+            add_operand(inst, &assign.value->literal, OPERAND_LITERAL);
+            break;
+        case NODE_REF_EXPR:
+            add_operand(inst, assign.value->ref, OPERAND_VARIABLE);
+            break;
+        default:
+            emit(builder, assign.value);
+            Instruction *temporary = previous_instruction(builder);
+            add_operand(inst, temporary->assignee, OPERAND_VARIABLE);
+    }
+
+    add_instruction(builder, inst);
+}
+
+static void emit_return(IRBuilder *builder, RetStmt ret)
+{
+    Instruction *inst = make_instruction(OP_RET);
+
+    switch (ret.value->kind) {
+        case NODE_LITERAL_EXPR:
+            add_operand(inst, &ret.value->literal, OPERAND_LITERAL);
+            break;
+        case NODE_REF_EXPR:
+            add_operand(inst, ret.value->ref, OPERAND_VARIABLE);
+            break;
+        default:
+            emit(builder, ret.value);
+            Instruction *temporary = previous_instruction(builder);
+            add_operand(inst, temporary->assignee, OPERAND_VARIABLE);
+    }
+
+    add_instruction(builder, inst);
+}
+
+char *create_temporary_name(IRBuilder *builder)
+{
+    // Generate a random 6 character string for the temporary variable
+    char *temporary_name = NULL;
+
+    do {
+        temporary_name = rand_str(6);
+        if (!table_lookup(builder->var_names, temporary_name))
+            break;
+        free(temporary_name);
+    } while (!temporary_name);
+
+    return temporary_name;
+}
+
+static void emit_unary(IRBuilder *builder, UnaryExpr unary)
+{
+    Instruction *inst = make_instruction((OpCode)unary.un_op);
+    inst->assignee = create_temporary_name(builder);
+
+    switch (unary.expr->kind) {
+        case NODE_LITERAL_EXPR:
+            add_operand(inst, &unary.expr->literal, OPERAND_LITERAL);
+            break;
+        case NODE_REF_EXPR:
+            add_operand(inst, unary.expr->ref, OPERAND_VARIABLE);
+            break;
+        default:
+            emit(builder, unary.expr);
+            Instruction *temporary = previous_instruction(builder);
+            add_operand(inst, temporary->assignee, OPERAND_VARIABLE);
+    }
+
+    add_instruction(builder, inst);
+}
+
+static void emit_binary(IRBuilder *builder, BinaryExpr binary)
+{
+    Instruction *inst = make_instruction((OpCode)binary.bin_op);
+    inst->assignee = create_temporary_name(builder);
+
+    ASTNode *exprs[2] = {binary.lhs, binary.rhs};
+    for (uint8_t i = 0; i < 2; i++) {
+        ASTNode *expr = exprs[i];
+        switch (expr->kind) {
+            case NODE_LITERAL_EXPR:
+                add_operand(inst, &expr->literal, OPERAND_LITERAL);
+                break;
+            case NODE_REF_EXPR:
+                add_operand(inst, expr->ref, OPERAND_VARIABLE);
+                break;
+            default:
+                emit(builder, expr);
+                Instruction *temporary = previous_instruction(builder);
+                add_operand(inst, temporary->assignee, OPERAND_VARIABLE);
+        }
+    }
+
+    add_instruction(builder, inst);
+}
+
+static ASTNode *emit(IRBuilder *builder, ASTNode *node)
+{
+    if (!node) return NULL;
+
+    node->visited = true;
     ASTNode *next = node->next;
-    Instruction *inst = NULL;
 
     switch (node->kind) {
         case NODE_FUNC_DECL:
-            add_block(builder, node->func_decl.name);
-
-            inst = make_instruction(OP_DEF);
-
-            inst->operands[0].kind = OPERAND_LABEL;
-            inst->operands[0].label_name = node->func_decl.name;
-
-            inst->num_operands = 1;
-
-            add_instruction(builder, inst);
-
-            emit(builder, node->func_decl.params);
-            emit(builder, node->func_decl.body);
+            emit_function(builder, node->func_decl);
             break;
         case NODE_VAR_DECL:
-            inst = make_instruction(OP_LOAD);
-
-            inst->operands[0].kind = OPERAND_REGISTER;
-            inst->operands[0].reg_name = node->var_decl.name;
-
-            inst->num_operands = 1;
-
-            add_instruction(builder, inst);
-
-            if (node->var_decl.init) {
-                Instruction *store_inst = make_instruction(OP_STORE);
-
-                store_inst->operands[0].kind = OPERAND_REGISTER;
-                store_inst->operands[0].reg_name = node->assign.name;
-
-                if (is_compound(node->var_decl.init)) {
-                    emit(builder, node->var_decl.init);
-                    Instruction *previous = previous_instruction(builder);
-                    store_inst->operands[1].kind = OPERAND_REGISTER;
-                    store_inst->operands[1].reg_name = previous->operands[0].reg_name;
-                }
-                else {
-                    switch (node->var_decl.init->kind) {
-                        case NODE_LITERAL_EXPR:
-                            store_inst->operands[1].kind = OPERAND_LITERAL;
-                            store_inst->operands[1].literal = node->var_decl.init->literal;
-                            break;
-                        case NODE_REF_EXPR:
-                            store_inst->operands[1].kind = OPERAND_REGISTER;
-                            store_inst->operands[1].reg_name = node->var_decl.init->ref;
-                            break;
-                        default: error("unexpected compound node: %d",
-                                         node->var_decl.init->kind);
-                    }
-                }
-                add_instruction(builder, store_inst);
-            }
+            emit_variable(builder, node->var_decl);
             break;
         case NODE_ASSIGN_STMT:
-            inst = make_instruction(OP_STORE);
-
-            inst->operands[0].kind = OPERAND_REGISTER;
-            inst->operands[0].reg_name = node->assign.name;
-
-            if (is_compound(node->assign.value)) {
-                emit(builder, node->assign.value);
-                Instruction *previous = previous_instruction(builder);
-                inst->operands[1].kind = OPERAND_REGISTER;
-                inst->operands[1].reg_name = previous->operands[0].reg_name;
-            }
-            else {
-                switch (node->assign.value->kind) {
-                    case NODE_LITERAL_EXPR:
-                        inst->operands[1].kind = OPERAND_LITERAL;
-                        inst->operands[1].literal = node->assign.value->literal;
-                        break;
-                    case NODE_REF_EXPR:
-                        inst->operands[1].kind = OPERAND_REGISTER;
-                        inst->operands[1].reg_name = node->assign.value->ref;
-                        break;
-                    default: error("unexpected compound node: %d",
-                                     node->assign.value->kind);
-                }
-            }
-
-            inst->num_operands = 2;
-
-            add_instruction(builder, inst);
+            emit_assignment(builder, node->assign);
             break;
         case NODE_COND_STMT:
-            error("conditional translations to IR are not implemented yet");
+            error("conditional translation to IR is not implemented yet");
             break;
         case NODE_RET_STMT:
-            inst = make_instruction(OP_RET);
-
-            if (is_compound(node->ret_stmt.value)) {
-                emit(builder, node->ret_stmt.value);
-                Instruction *previous = previous_instruction(builder);
-                inst->operands[0].kind = OPERAND_REGISTER;
-                inst->operands[0].reg_name = previous->operands[0].reg_name;
-            }
-            else {
-                switch (node->ret_stmt.value->kind) {
-                    case NODE_LITERAL_EXPR:
-                        inst->operands[0].kind = OPERAND_LITERAL;
-                        inst->operands[0].literal = node->ret_stmt.value->literal;
-                        break;
-                    case NODE_REF_EXPR:
-                        inst->operands[0].kind = OPERAND_REGISTER;
-                        inst->operands[0].reg_name = node->ret_stmt.value->ref;
-                        break;
-                    default: error("unexpected compound node: %d",
-                                     node->ret_stmt.value->kind);
-                }
-            }
-
-            inst->num_operands = 1;
-
-            add_instruction(builder, inst);
+            emit_return(builder, node->ret_stmt);
             break;
         case NODE_UNARY_EXPR:
-            inst = make_instruction((OpCode)node->unary.un_op);
-
-            // x := -(a + b * c / d)
-            if (is_compound(node->unary.expr)) {
-                emit(builder, node->unary.expr);
-                Instruction *previous = previous_instruction(builder);
-                inst->operands[0].kind = OPERAND_REGISTER;
-                inst->operands[0].reg_name = previous->operands[1].reg_name;
-            }
-            else {
-                switch (node->unary.expr->kind) {
-                    case NODE_LITERAL_EXPR:
-                        inst->operands[0].kind = OPERAND_LITERAL;
-                        inst->operands[0].literal = node->unary.expr->literal;
-                        break;
-                    case NODE_REF_EXPR:
-                        inst->operands[0].kind = OPERAND_REGISTER;
-                        inst->operands[0].reg_name = node->unary.expr->ref;
-                        break;
-                    default: error("unexpected compound node: %d",
-                                     node->ret_stmt.value->kind);
-                }
-            }
-
-            inst->num_operands = 1;
-
-            add_instruction(builder, inst);
+            emit_unary(builder, node->unary);
             break;
         case NODE_BINARY_EXPR:
-            inst = make_instruction((OpCode)node->binary.bin_op);
-
-            Operand *left = &inst->operands[0];
-            Operand *right = &inst->operands[1];
-
-            if (is_compound(node->binary.lhs)) {
-                emit(builder, node->binary.lhs);
-                Instruction *previous = previous_instruction(builder);
-                left->kind = OPERAND_REGISTER;
-                left->reg_name = previous->operands[0].reg_name;
-            }
-            else {
-                switch (node->binary.lhs->kind) {
-                    case NODE_LITERAL_EXPR:
-                        left->kind = OPERAND_LITERAL;
-                        left->literal = node->binary.lhs->literal;
-                        break;
-                    case NODE_REF_EXPR:
-                        left->kind = OPERAND_REGISTER;
-                        left->reg_name = node->binary.lhs->ref;
-                        break;
-                    default: error("unexpected compound node: %d",
-                                     node->binary.lhs->kind);
-                }
-            }
-
-            if (is_compound(node->binary.rhs)) {
-                emit(builder, node->binary.rhs);
-                Instruction *previous = previous_instruction(builder);
-                right->kind = OPERAND_REGISTER;
-                right->reg_name = previous->operands[0].reg_name;
-            }
-            else {
-                switch (node->binary.rhs->kind) {
-                    case NODE_LITERAL_EXPR:
-                        right->kind = OPERAND_LITERAL;
-                        right->literal = node->binary.rhs->literal;
-                        break;
-                    case NODE_REF_EXPR:
-                        right->kind = OPERAND_REGISTER;
-                        right->reg_name = node->binary.rhs->ref;
-                        break;
-                    default: error("unexpected compound node: %d",
-                                     node->binary.rhs->kind);
-                }
-            }
-
-            inst->num_operands = 2;
-
-            add_instruction(builder, inst);
+            emit_binary(builder, node->binary);
             break;
         case NODE_LITERAL_EXPR: // Leaf node
         case NODE_REF_EXPR:
-            inst = make_instruction(OP_LOAD);
-
-            // Generate a random 6 character string for the temporary register
-            char *temporary_name = NULL;
-            do {
-                temporary_name = rand_str(6);
-                if (!table_lookup(builder->register_names, temporary_name))
-                    break;
-                free(temporary_name);
-            } while (!temporary_name);
-
-            inst->operands[0].kind = OPERAND_REGISTER;
-            inst->operands[0].reg_name = temporary_name;
-
-            if (node->kind == NODE_LITERAL_EXPR) {
-                inst->operands[1].kind = OPERAND_LITERAL;
-                inst->operands[1].literal = node->literal;
-            }
-            else {
-                inst->operands[1].kind = OPERAND_REGISTER;
-                inst->operands[1].reg_name = node->ref;
-            }
-
-            add_instruction(builder, inst);
-            return;
+            return node;
         default: error("cannot emit IR from node: %d", node->kind);
     }
 
     emit(builder, next);
+    return NULL;
 }
 
 Program emit_ir(ASTNode *root)
@@ -356,41 +321,85 @@ Program emit_ir(ASTNode *root)
     return program;
 }
 
+void dump_operand(Operand operand)
+{
+    switch (operand.kind) {
+        case OPERAND_LITERAL:
+            dump_literal(operand.literal);
+            break;
+        case OPERAND_VARIABLE:
+            printf("%s", operand.var);
+            break;
+        case OPERAND_LABEL:
+            printf("%s", operand.label);
+            break;
+        default: error("invalid OperandKind: %d", operand.kind);
+    }
+}
+
+char *opcode_as_str(OpCode opcode)
+{
+    switch (opcode) {
+        case OP_ADD:
+            return "+";
+        case OP_NEG:
+        case OP_SUB: return "-";
+        case OP_MUL: return "*";
+        case OP_DIV: return "/";
+        case OP_NOT: return "!";
+        case OP_CMP: return "==";
+        case OP_CMP_NOT: return "!=";
+        case OP_CMP_LT: return "<";
+        case OP_CMP_GT: return ">";
+        case OP_CMP_LT_EQ: return "<=";
+        case OP_CMP_GT_EQ: return ">=";
+        default: error("invalid OpCode %d", opcode);
+    }
+    return "";
+}
+
 void dump_instruction(Instruction *inst)
 {
     switch (inst->opcode) {
         case OP_DEF:
-            printf("def %s:\n", inst->operands[0].label_name);
+            assert(inst->num_operands == 1);
+            printf("def ");
+            dump_operand(inst->operands[0]);
             break;
-        case OP_LOAD:
-            printf("  load %s\n", inst->operands[0].reg_name);
+        case OP_ASSIGN:
+            assert(inst->num_operands == 1);
+            printf("  %s := ", inst->assignee);
+            dump_operand(inst->operands[0]);
             break;
-        case OP_STORE:
-            printf("  store %s ", inst->operands[0].reg_name);
-            switch (inst->operands[1].kind) {
-                case OPERAND_LITERAL:
-                    // TODO: fix this
-                    printf("%x\n", inst->operands[1].literal);
-                    break;
-                case OPERAND_REGISTER:
-                    printf("%s\n", inst->operands[1].reg_name);
-                    break;
-                default: error("unexpected operand: %d", inst->operands[1].kind);
-            }
+        case OP_NEG:
+        case OP_NOT:
+            assert(inst->num_operands == 1);
+            printf("  %s := ", inst->assignee);
+            printf(opcode_as_str(inst->opcode));
+            dump_operand(inst->operands[0]);
             break;
-        case OP_ADD:
-            printf("  add %s %s\n",
-                    inst->operands[0].reg_name,
-                    inst->operands[1].reg_name);
-            break;
+        case OP_ADD: // Binary Ops
+        case OP_SUB:
         case OP_MUL:
-            printf("  mul %s %s\n",
-                    inst->operands[0].reg_name,
-                    inst->operands[1].reg_name);
+        case OP_DIV:
+        case OP_CMP:
+        case OP_CMP_NOT:
+        case OP_CMP_LT:
+        case OP_CMP_GT:
+        case OP_CMP_LT_EQ:
+        case OP_CMP_GT_EQ:
+            assert(inst->num_operands == 2);
+            printf("  %s := ", inst->assignee);
+            dump_operand(inst->operands[0]);
+            printf(opcode_as_str(inst->opcode));
+            dump_operand(inst->operands[1]);
             break;
         case OP_RET:
-            printf("  ret %s\n", inst->operands[0].reg_name);
+            assert(inst->num_operands == 1);
+            printf("  ret ");
+            dump_operand(inst->operands[0]);
             break;
-        default: error("invalid Instruction! (%d)", inst->opcode);
+        default: error("invalid Instruction: %d", inst->opcode);
     }
+    printf("\n");
 }

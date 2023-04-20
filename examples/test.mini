@@ -1,14 +1,19 @@
+/*
 const foo: bool = false;
 
 func add_two(x: int, y: int) -> int {
     return x + y;
 }
+*/
 
-// This is a comment
 func main() {
-    x := -1;
-    y := 2;
-    z := 3;
-    num := x + y * z;
+    num := -1 + 2 * 3;
     return num;
 }
+
+/* In Three-Address Code:
+
+$t1 := 2 * 3
+num := -1 + t1
+
+*/
