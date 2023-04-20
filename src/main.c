@@ -92,6 +92,7 @@ int main(int argc, char **argv)
 
     init_global_scope();
 
+    // Lexical Analysis
     Vector tokens = lex(file);
     if (opts.dump_flags & DUMP_TOKENS) {
         for (size_t i = 0; i < tokens.size; i++) {
@@ -102,6 +103,7 @@ int main(int argc, char **argv)
     }
     fclose(file);
 
+    // Semantic Analysis
     ASTNode *ast = parse(tokens);
     if (opts.dump_flags & DUMP_AST) {
         dump_ast(ast, 0);
@@ -111,8 +113,10 @@ int main(int argc, char **argv)
         symbol_table_dump(global_scope, 0);
     }
 
+    // Optimization: Constant Folding
     fold_constants(ast);
 
+    // IR Translation
     Symbol *entry_point = symbol_table_lookup(global_scope, "main");
     Program program = emit_ir(entry_point->node);
     if (opts.dump_flags & DUMP_IR) {
@@ -133,6 +137,24 @@ int main(int argc, char **argv)
         }
     }
 
-    printf("compiling to `%s`\n", opts.output_filename);
+    // Iterate top-level of AST and print warnings for unused nodes
+    ASTNode *iter = ast;
+    while (iter) {
+        if (!iter->visited) {
+            switch (iter->kind) {
+                case NODE_FUNC_DECL:
+                    LOG_WARN("unused function %s at line %d, col %d",
+                            iter->func_decl.name, iter->line, iter->col);
+                    break;
+                case NODE_VAR_DECL:
+                    LOG_WARN("unused variable %s at line %d, col %d", 
+                            iter->var_decl.name, iter->line, iter->col);
+                    break;
+            }
+        }
+
+        iter = iter->next;
+    }
+
     return 0;
 }

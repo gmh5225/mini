@@ -9,7 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* MINI Intermediate Representation */
+/* MINI Intermediate Representation (Three-Address Code) */
 
 typedef enum OpCode OpCode;
 typedef enum OperandKind OperandKind;

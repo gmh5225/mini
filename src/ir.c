@@ -123,6 +123,22 @@ static void add_operand(Instruction *inst, void *value, OperandKind kind)
     inst->operands[inst->num_operands++] = operand;
 }
 
+static void add_operands_from_node(IRBuilder *builder, Instruction *inst, ASTNode *node)
+{
+    switch (node->kind) {
+        case NODE_LITERAL_EXPR:
+            add_operand(inst, &node->literal, OPERAND_LITERAL);
+            break;
+        case NODE_REF_EXPR:
+            add_operand(inst, node->ref, OPERAND_VARIABLE);
+            break;
+        default:
+            emit(builder, node);
+            Instruction *temporary = previous_instruction(builder);
+            add_operand(inst, temporary->assignee, OPERAND_VARIABLE);
+    }
+}
+
 static void emit_function(IRBuilder *builder, FuncDecl func)
 {
     add_block(builder, func.name);
@@ -143,19 +159,7 @@ static void emit_variable(IRBuilder *builder, VarDecl var)
 
     table_insert(builder->var_names, var.name, var.name);
 
-    switch (var.init->kind) {
-        case NODE_LITERAL_EXPR:
-            add_operand(inst, &var.init->literal, OPERAND_LITERAL);
-            break;
-        case NODE_REF_EXPR:
-            add_operand(inst, var.init->ref, OPERAND_VARIABLE);
-            break;
-        default:
-            emit(builder, var.init);
-            Instruction *temporary = previous_instruction(builder);
-            add_operand(inst, temporary->assignee, OPERAND_VARIABLE);
-    }
-
+    add_operands_from_node(builder, inst, var.init);
     add_instruction(builder, inst);
 }
 
@@ -164,39 +168,14 @@ static void emit_assignment(IRBuilder *builder, AssignStmt assign)
     Instruction *inst = make_instruction(OP_ASSIGN);
     inst->assignee = assign.name;
 
-    switch (assign.value->kind) {
-        case NODE_LITERAL_EXPR:
-            add_operand(inst, &assign.value->literal, OPERAND_LITERAL);
-            break;
-        case NODE_REF_EXPR:
-            add_operand(inst, assign.value->ref, OPERAND_VARIABLE);
-            break;
-        default:
-            emit(builder, assign.value);
-            Instruction *temporary = previous_instruction(builder);
-            add_operand(inst, temporary->assignee, OPERAND_VARIABLE);
-    }
-
+    add_operands_from_node(builder, inst, assign.value);
     add_instruction(builder, inst);
 }
 
 static void emit_return(IRBuilder *builder, RetStmt ret)
 {
     Instruction *inst = make_instruction(OP_RET);
-
-    switch (ret.value->kind) {
-        case NODE_LITERAL_EXPR:
-            add_operand(inst, &ret.value->literal, OPERAND_LITERAL);
-            break;
-        case NODE_REF_EXPR:
-            add_operand(inst, ret.value->ref, OPERAND_VARIABLE);
-            break;
-        default:
-            emit(builder, ret.value);
-            Instruction *temporary = previous_instruction(builder);
-            add_operand(inst, temporary->assignee, OPERAND_VARIABLE);
-    }
-
+    add_operands_from_node(builder, inst, ret.value);
     add_instruction(builder, inst);
 }
 
@@ -220,19 +199,7 @@ static void emit_unary(IRBuilder *builder, UnaryExpr unary)
     Instruction *inst = make_instruction((OpCode)unary.un_op);
     inst->assignee = create_temporary_name(builder);
 
-    switch (unary.expr->kind) {
-        case NODE_LITERAL_EXPR:
-            add_operand(inst, &unary.expr->literal, OPERAND_LITERAL);
-            break;
-        case NODE_REF_EXPR:
-            add_operand(inst, unary.expr->ref, OPERAND_VARIABLE);
-            break;
-        default:
-            emit(builder, unary.expr);
-            Instruction *temporary = previous_instruction(builder);
-            add_operand(inst, temporary->assignee, OPERAND_VARIABLE);
-    }
-
+    add_operands_from_node(builder, inst, unary.expr);
     add_instruction(builder, inst);
 }
 
@@ -244,18 +211,7 @@ static void emit_binary(IRBuilder *builder, BinaryExpr binary)
     ASTNode *exprs[2] = {binary.lhs, binary.rhs};
     for (uint8_t i = 0; i < 2; i++) {
         ASTNode *expr = exprs[i];
-        switch (expr->kind) {
-            case NODE_LITERAL_EXPR:
-                add_operand(inst, &expr->literal, OPERAND_LITERAL);
-                break;
-            case NODE_REF_EXPR:
-                add_operand(inst, expr->ref, OPERAND_VARIABLE);
-                break;
-            default:
-                emit(builder, expr);
-                Instruction *temporary = previous_instruction(builder);
-                add_operand(inst, temporary->assignee, OPERAND_VARIABLE);
-        }
+        add_operands_from_node(builder, inst, expr);
     }
 
     add_instruction(builder, inst);
@@ -269,6 +225,9 @@ static ASTNode *emit(IRBuilder *builder, ASTNode *node)
     ASTNode *next = node->next;
 
     switch (node->kind) {
+        case NODE_NOOP:
+            free(node);
+            break;
         case NODE_FUNC_DECL:
             emit_function(builder, node->func_decl);
             break;

@@ -6,20 +6,24 @@
 
 void fold_constants(ASTNode *node)
 {
+    if (!node) return;
+
+    ASTNode *next = node->next;
+
     switch (node->kind) {
-        case NODE_VAR_DECL:
-            VarDecl var = node->var_decl;
-            // num = num;
-            if (var.init->kind == NODE_REF_EXPR &&
-                    strcmp(var.name, var.init->ref) == 0) {
-                node->kind = NODE_NOOP;
-                free(var.init);
-            }
+        case NODE_FUNC_DECL:
+            fold_constants(node->func_decl.body);
             break;
         case NODE_ASSIGN_STMT:
             AssignStmt assign = node->assign;
-            if (assign.value->kind == NODE_REF_EXPR &&
+            if (assign.value->kind == NODE_REF_EXPR && 
                     strcmp(assign.name, assign.value->ref) == 0) {
+
+#ifdef DEBUG
+                LOG_INFO("elminiating self-assignment of variable `%s` on line %d, col %d",
+                        assign.name, node->line, node->col);
+#endif
+
                 node->kind = NODE_NOOP;
                 free(assign.value);
             }
@@ -36,6 +40,7 @@ void fold_constants(ASTNode *node)
                 }
             }
             break;
-        default: break;
     }
+
+    fold_constants(next);
 }

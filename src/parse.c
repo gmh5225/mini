@@ -270,6 +270,7 @@ static ASTNode *parse_variable_declaration(char *var_name)
     }
 
     ASTNode *node = make_node(NODE_VAR_DECL);
+    node->line = line; node->col = col;
     node->var_decl.name = var_name;
     node->var_decl.type = primitive_types[TYPE_VOID];
 
@@ -319,6 +320,9 @@ static ASTNode *parse_variable_declaration(char *var_name)
 
 static ASTNode *parse_variable_assignment(char *var_name)
 {
+    int line = tok()->line;
+    int col = tok()->col;
+
     consume(); // consume `=`
 
     if (!symbol_table_lookup(current_scope, var_name)) {
@@ -326,6 +330,7 @@ static ASTNode *parse_variable_assignment(char *var_name)
     }
 
     ASTNode *node = make_node(NODE_ASSIGN_STMT);
+    node->line = line; node->col = col;
     node->assign.name = var_name;
     node->assign.value = parse_expression();
 
@@ -396,8 +401,6 @@ static ASTNode *parse_block(in_func_toplevel)
     }
     expect(TOKEN_RBRACE);
 
-    // If the last statement wasn't a return statement, we assume that the function
-    // returns void. Insert this return node to aid with SSA in the initial optimization pass.
     if (in_func_toplevel && (!stmt || stmt->kind != NODE_RET_STMT)) {
         ASTNode *implicit = make_node(NODE_RET_STMT);
         implicit->ret_stmt.value = NULL;
@@ -409,11 +412,15 @@ static ASTNode *parse_block(in_func_toplevel)
 
 static ASTNode *parse_function_declaration()
 {
+    int line = tok()->line;
+    int col = tok()->col;
+
     consume(); // consume keyword `func`
     char *func_name = expect(TOKEN_IDENTIFIER)->str.data;
 
     // Parse identifier
     ASTNode *node = make_node(NODE_FUNC_DECL);
+    node->line = line; node->col = col;
     node->func_decl.name = func_name;
     node->func_decl.return_type = primitive_types[TYPE_VOID];
 

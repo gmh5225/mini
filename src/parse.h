@@ -160,6 +160,7 @@ struct ASTNode
         char *ref;
     };
     bool visited;
+    int line, col;
 };
 
 ASTNode *parse(Vector tokens);
