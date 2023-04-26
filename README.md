@@ -1,6 +1,6 @@
 # mini
 
-A compiler for a statically & strongly typed, C-like programming language.
+An experimental compiler for a C-like programming language.
 This is a research project designed to explore all aspects of compiler design.
 
 NOTE: This project is a WIP and unstable.
