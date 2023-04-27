@@ -43,6 +43,7 @@ intmax_t fold_int(BinaryOp op, intmax_t left, intmax_t right)
     return result;
 }
 
+// Performs Constant Folding and Common-Subexpression Elimination in one pass
 void fold_constants(ASTNode *node)
 {
     if (!node) return;

@@ -20,6 +20,7 @@
 void fatal(const char *fmt, ...);
 
 uint64_t hash(const char *s);
+uint64_t hash_n(uint8_t *data, size_t size);
 
 int str_to_int(const char *s, size_t length);
 char *aprintf(const char *fmt, ...);

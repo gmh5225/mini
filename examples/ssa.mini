@@ -1,10 +1,12 @@
+/*
 func ssa1() {
     y := 1;
     y = 2;
     x := y;
 }
+*/
 
-func ssa2() {
+func main() -> int {
     x := 5;
     x = x - 3;
     y := 0;
@@ -20,8 +22,4 @@ func ssa2() {
     w = x - y;
     z := x + y;
     return z;
-}
-
-func main() -> int {
-    return 0;
 }

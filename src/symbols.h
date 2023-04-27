@@ -25,11 +25,8 @@ struct Symbol
     char *name;
     bool is_constant;
     bool is_initialized;
-    union 
-    {
-        Type type;
-        ASTNode *node;
-    };
+    Type type;
+    ASTNode *node;
     Symbol *next;
 };
 

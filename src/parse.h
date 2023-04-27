@@ -127,7 +127,7 @@ struct Literal
 };
 
 void dump_literal(Literal literal);
-char *copy_literal_bytes(Literal *literal, size_t *size);
+uint8_t *copy_literal(Literal *literal, size_t *literal_size);
 
 enum NodeKind
 {

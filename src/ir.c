@@ -73,38 +73,26 @@ static void add_block(IRBuilder *builder, char *tag)
 
 static char *encode_instruction(IRBuilder *builder, Instruction *inst)
 {
-    size_t capacity = 16;
-    char *encoded = calloc(capacity, sizeof(char));
-    size_t size = 0;
-
-    for (size_t i = 0; i < inst->num_operands; i++) {
-        Operand operand = inst->operands[i];
-        switch (operand.kind) {
-            case OPERAND_LITERAL:
-                size_t literal_bytes_size = 0;
-                char *literal_bytes = copy_literal_bytes(&operand.literal, &literal_bytes_size);
-                if (size + literal_bytes_size >= capacity) {
-                    capacity += literal_bytes_size + 1;
-                    void *tmp = realloc(encoded, capacity * sizeof(char));
-                    encoded = tmp;
-                }
-                memcpy(encoded + size, literal_bytes, literal_bytes_size);
-                size += literal_bytes_size;
-                break;
-            case OPERAND_VARIABLE:
-                size_t var_name_size = strlen(operand.var);
-                if (size + var_name_size >= capacity) {
-                    capacity += var_name_size + 1;
-                    void *tmp = realloc(encoded, capacity * sizeof(char));
-                    encoded = tmp;
-                }
-                memcpy(encoded + size, operand.var, var_name_size);
-                size += var_name_size;
-                break;
-            default: fatal("cannot encode invalid OperandKind: %d", operand.kind);
-        }
+    size_t size = 1 + (sizeof(Operand) * inst->num_operands);
+    uint8_t *buf = calloc(size, sizeof(uint8_t));
+    memcpy(buf, &inst->opcode, 1);
+    for (uint8_t i = 0; i < inst->num_operands; i++) {
+        // TODO: since this is a shallow copy, will this work for strings?
+        // how should we handle that case?
+        memcpy(buf, &inst->operands[i], sizeof(Operand));
     }
-    encoded[size] = 0;
+
+    uint64_t inst_hash = hash_n(buf, size);
+    char *encoded = aprintf("%zu", inst_hash);
+
+#ifdef DEBUG
+    printf("encoded %s = ", inst->assignee);
+    for (size_t i = 0; i < strlen(encoded); i++) {
+        printf("%X ", encoded[i]);
+    }
+    printf("\n");
+#endif
+
     return encoded;
 }
 
@@ -273,7 +261,8 @@ static ASTNode *emit(IRBuilder *builder, ASTNode *node)
             emit_assignment(builder, node->assign);
             break;
         case NODE_COND_STMT:
-            fatal("conditional translation to IR is not implemented yet");
+            LOG_WARN("skipping conditional for now...");
+            // fatal("conditional translation to IR is not implemented yet");
             break;
         case NODE_RET_STMT:
             emit_return(builder, node->ret_stmt);

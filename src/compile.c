@@ -10,6 +10,7 @@
 #include <string.h>
 
 SymbolTable *global_scope = NULL;
+TypeID registered_types = 0;
 
 static void initialize_compiler_context()
 {
@@ -18,11 +19,13 @@ static void initialize_compiler_context()
         fatal("couldn't allocate symbol table for global_scope!");
     }
 
+    registered_types = TYPE_VOID;
     // Add supported primitive types to global scope
     for (TypeKind kind = TYPE_VOID; kind <= TYPE_BOOL; kind++) {
         Type primitive = primitive_types[kind];
         Symbol *primitive_sym = symbol_table_insert(global_scope, primitive.name, SYMBOL_TYPE);
         primitive_sym->type = primitive;
+        registered_types++;
     }
 }
 

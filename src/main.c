@@ -39,7 +39,7 @@ MiniOpts parse_mini_options(int argc, char **argv)
         }
         else if (strcmp(arg, "--no-fold") == 0) {
             opts.optimize_flags ^= O_FOLD_CONSTANTS;
-            LOG_WARN("constant folding disabled.");
+            LOG_WARN("constant folding and common subexpression elimination disabled.");
         }
         else {
             opts.input_filename = arg;

@@ -4,6 +4,9 @@
 #include <stdbool.h>
 
 typedef enum TypeKind TypeKind;
+typedef int TypeID;
+typedef struct Type Type;
+
 enum TypeKind
 {
     TYPE_UNKNOWN,
@@ -18,17 +21,15 @@ enum TypeKind
     TYPE_ENUM,
 };
 
-typedef struct Type Type;
 struct Type
 {
     TypeKind kind;
+    TypeID id;
     char *name;
     int align;
     int size;
     bool is_pointer;
 };
-
-bool types_equal(Type a, Type b);
 
 extern const Type primitive_types[];
 

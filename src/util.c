@@ -32,6 +32,19 @@ uint64_t hash(const char *s)
     return hash;
 }
 
+uint64_t hash_n(uint8_t *data, size_t size)
+{
+    const uint64_t FNV_PRIME = 0x100000001b3;
+    const uint64_t FNV_OFFSET_BASIS = 0xcbf29ce484222325;
+
+    uint64_t hash = FNV_OFFSET_BASIS;
+    for (size_t i = 0; i < size; i++) {
+        hash ^= data[i];
+        hash *= FNV_PRIME;
+    }
+    return hash;
+}
+
 char *aprintf(const char *fmt, ...)
 {
     va_list args;

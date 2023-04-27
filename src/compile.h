@@ -33,5 +33,7 @@ MiniOpts parse_mini_options(int argc, char **argv);
 int compile(MiniOpts opts);
 
 extern SymbolTable *global_scope;
+extern TypeID registered_types;
+
 
 #endif

@@ -96,9 +96,10 @@ static ASTNode *parse_binary_expr(char bin_op, int line, int col)
 
     Type lhs_type = node->binary.lhs->type;
     Type rhs_type = node->binary.rhs->type;
-    if (!types_equal(lhs_type, rhs_type)) {
+    if (lhs_type.id != rhs_type.id) {
         fatal("at line %d, col %d: type mismatch in binary expression\n"
-            "LHS(%s) != RHS(%s)", line, col, lhs_type.name, rhs_type.name);
+            "LHS(%s, id: %d) != RHS(%s, id: %d)", line, col, 
+            lhs_type.name, lhs_type.id, rhs_type.name, rhs_type.id);
     }
 
     node->type = node->binary.lhs->type;
@@ -155,7 +156,7 @@ void parse_term()
                 bin_op = BIN_MUL; consume(); 
                 break;
             case TOKEN_SLASH: 
-                bin_op = BIN_DIV; consume(); 
+                bin_op = BIN_DIV; consume();
                 break;
             default: break;
         }
@@ -307,7 +308,7 @@ static ASTNode *parse_variable_declaration(char *var_name)
 
             Type decl_type = node->var_decl.type;
             Type assign_type = node->var_decl.init->type;
-            if (!types_equal(decl_type, assign_type)) {
+            if (decl_type.id != assign_type.id) {
                 fatal("at line %d, col %d: variable assignment does not match variable type\n"
                     "Variable of type `%s` != Assignment of type `%s`",
                     line, col, decl_type.name, assign_type.name);
@@ -450,6 +451,9 @@ static ASTNode *parse_function_declaration()
     // Add function scope as child of current scope
     symbol_table_add_child(current_scope, func_scope);
 
+    // Enter the function's scope
+    enter_scope(func_scope);
+
     // Parse parameters
     ASTNode params = {0};
     ASTNode *cur = &params;
@@ -490,9 +494,6 @@ static ASTNode *parse_function_declaration()
     // Parse function return type (if no arrow, it's TYPE_VOID)
     if (match(TOKEN_ARROW))
         node->func_decl.return_type = parse_type();
-
-    // Enter the function's scope
-    enter_scope(func_scope);
 
     // Parse function body
     node->func_decl.body = parse_block(true);
@@ -665,54 +666,54 @@ void dump_literal(Literal literal)
     }
 }
 
-char *copy_literal_bytes(Literal *literal, size_t *size)
+uint8_t *copy_literal(Literal *literal, size_t *literal_size)
 {
-    char *bytes = NULL;
-    size_t bytes_size = 0;
+    uint8_t *bytes = NULL;
+    size_t size = 0;
 
     switch (literal->kind) {
         case L_INT:
-            bytes_size += sizeof(intmax_t);
-            bytes = calloc(bytes_size, sizeof(char));
-            memcpy(bytes, &literal->i_val, bytes_size);
+            size += sizeof(intmax_t);
+            bytes = calloc(size, sizeof(uint8_t));
+            memcpy(bytes, &literal->i_val, size);
             break;
         case L_UINT:
-            bytes_size += sizeof(uintmax_t);
-            bytes = calloc(bytes_size, sizeof(char));
-            memcpy(bytes, &literal->u_val, bytes_size);
+            size += sizeof(uintmax_t);
+            bytes = calloc(size, sizeof(uint8_t));
+            memcpy(bytes, &literal->u_val, size);
             break;
         case L_FLOAT:
-            bytes_size += sizeof(float);
-            bytes = calloc(bytes_size, sizeof(char));
-            memcpy(bytes, &literal->f_val, bytes_size);
+            size += sizeof(float);
+            bytes = calloc(size, sizeof(uint8_t));
+            memcpy(bytes, &literal->f_val, size);
             break;
         case L_DOUBLE:
-            bytes_size += sizeof(double);
-            bytes = calloc(bytes_size, sizeof(char));
-            memcpy(bytes, &literal->d_val, bytes_size);
+            size += sizeof(double);
+            bytes = calloc(size, sizeof(uint8_t));
+            memcpy(bytes, &literal->d_val, size);
             break;
         case L_CHAR:
-            bytes_size += sizeof(char);
-            bytes = calloc(bytes_size, sizeof(char));
-            memcpy(bytes, &literal->c_val, bytes_size);
+            size += sizeof(uint8_t);
+            bytes = calloc(size, sizeof(uint8_t));
+            memcpy(bytes, &literal->c_val, size);
             break;
         case L_BOOL:
-            bytes_size += sizeof(bool);
-            bytes = calloc(bytes_size, sizeof(char));
-            memcpy(bytes, &literal->b_val, bytes_size);
+            size += sizeof(bool);
+            bytes = calloc(size, sizeof(uint8_t));
+            memcpy(bytes, &literal->b_val, size);
             break;
         case L_STRING:
-            bytes_size += literal->s_len;
-            bytes = calloc(bytes_size, sizeof(char));
-            memcpy(bytes, literal->s_val, bytes_size);
+            size += literal->s_len;
+            bytes = calloc(size, sizeof(uint8_t));
+            memcpy(bytes, literal->s_val, size);
             break;
         case L_SIZE:
-            bytes_size += sizeof(size_t);
-            bytes = calloc(bytes_size, sizeof(char));
-            memcpy(bytes, &literal->size, bytes_size);
+            size += sizeof(size_t);
+            bytes = calloc(size, sizeof(uint8_t));
+            memcpy(bytes, &literal->size, size);
             break;
     }
 
-    *size = bytes_size;
+    *literal_size = size;
     return bytes;
 }
