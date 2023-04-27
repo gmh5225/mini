@@ -8,20 +8,3 @@ func main() -> int {
 
     return y;
 }
-
-/*
-; MagicC IR
-
-def i32 main:
-    %x = alloc i32 1
-    store i32 %x -1
-    %y = alloc i32 1
-    store i32 %y 0
-    %cond = alloc bool 1
-    store %cond, cmp_gt %x, 0
-    br %cond, %cond.true, %cond.false
-cond.true:
-    %y = 42
-cond.false:
-    ret %y
-*/

@@ -1,6 +1,5 @@
 #include "codegen.h"
 #include "util.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,13 +24,13 @@ void code_buffer_write_bytes(CodeBuffer *code, char *bytes, size_t length) {
 void code_buffer_write_to_file(CodeBuffer *code, char *filename) {
     FILE *f = fopen(filename, "w");
     if (!f) {
-        error("couldn't open file: `%s`", filename);
+        fatal("couldn't open file: `%s`", filename);
     }
 
     size_t nwritten = fwrite(code->buffer, sizeof(char), code->code_length, f);
     if (nwritten != code->code_length) {
 #ifdef DEBUG
-        error("only wrote %zu/%zu bytes to file `%s`",
+        fatal("only wrote %zu/%zu bytes to file `%s`",
                 nwritten, code->code_length, filename);
 #endif
     }

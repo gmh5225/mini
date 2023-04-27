@@ -38,7 +38,7 @@ intmax_t fold_int(BinaryOp op, intmax_t left, intmax_t right)
         case BIN_CMP_GT_EQ:
             result = left >= right;
             break;
-        default: error("unknown BinaryOp in fold_int: %d", op);
+        default: fatal("unknown BinaryOp in fold_int: %d", op);
     }
     return result;
 }

@@ -233,11 +233,11 @@ CodeBuffer nasm_x86_64_generate(Program program)
             //            int length = 0;
             //            switch (symbol->type.kind) {
             //                case TYPE_VOID: 
-            //                    error("cannot allocate memory for void type");
+            //                    fatal("cannot allocate memory for void type");
             //                    break;
             //                case TYPE_INT:
             //                    break;
-            //                default: error("invalid type in codegen: %d", symbol->type.kind);
+            //                default: fatal("invalid type in codegen: %d", symbol->type.kind);
             //            }
 
             //            CB_WRITE(code->buffer, literal, length);
@@ -246,7 +246,7 @@ CodeBuffer nasm_x86_64_generate(Program program)
             //    }
 
             //    if (!allocated) {
-            //        error("global struct initialization not yet supported!");
+            //        fatal("global struct initialization not yet supported!");
             //    }
             //}
         }

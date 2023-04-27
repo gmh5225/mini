@@ -11,10 +11,19 @@ enum
     DUMP_IR = 1 << 4,
 };
 
+enum
+{
+    O_FOLD_CONSTANTS = 1 << 1,
+};
+
+#define DEFAULT_OPTIMIZATIONS \
+    O_FOLD_CONSTANTS
+
 typedef struct MiniOpts MiniOpts;
 struct MiniOpts
 {
     int dump_flags;
+    int optimize_flags;
     char *input_filename;
     char *output_filename;
 };

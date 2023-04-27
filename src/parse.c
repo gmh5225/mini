@@ -32,8 +32,8 @@ static Token *expect(TokenKind expected)
 {
     Token *got = consume();
     if (got->kind != expected) {
-        error_at_token(got, "expected `%s`, got `%s`",
-                token_as_str(expected), token_as_str(got->kind));
+        fatal("at line %d, col %d: expected `%s`, got `%s`",
+            got->line, got->col, token_as_str(expected), token_as_str(got->kind));
     }
     return got;
 }
@@ -97,8 +97,8 @@ static ASTNode *parse_binary_expr(char bin_op, int line, int col)
     Type lhs_type = node->binary.lhs->type;
     Type rhs_type = node->binary.rhs->type;
     if (!types_equal(lhs_type, rhs_type)) {
-        error_at(line, col, "type mismatch in binary expression\n"
-            "LHS(%s) != RHS(%s)", lhs_type.name, rhs_type.name);
+        fatal("at line %d, col %d: type mismatch in binary expression\n"
+            "LHS(%s) != RHS(%s)", line, col, lhs_type.name, rhs_type.name);
     }
 
     node->type = node->binary.lhs->type;
@@ -109,14 +109,15 @@ static void parse_factor()
 {
     ASTNode *node = make_node(NODE_LITERAL_EXPR);
 
-    switch (tok()->kind) {
+    Token *token = consume();
+    switch (token->kind) {
         case TOKEN_IDENTIFIER:
             // Check to see if the variable we are referencing is valid
-            char *var_name = consume()->str.data;
+            char *var_name = token->str.data;
             Symbol *var_sym = symbol_table_lookup(current_scope, var_name);
-            if (!var_sym) {
-                error_at_token(tok(), "unknown Symbol `%s`", var_name);
-            }
+            if (!var_sym)
+                fatal("at line %d, col %d: unknown Symbol `%s`", 
+                        token->line, token->col, var_name);
             node->kind = NODE_REF_EXPR;
             node->type = var_sym->type;
             node->ref = var_name;
@@ -126,17 +127,17 @@ static void parse_factor()
             // For now, we just assume its an `int`
             node->type = primitive_types[TYPE_INT];
             node->literal.kind = L_INT;
-            node->literal.i_val = consume()->i_val;
+            node->literal.i_val = token->i_val;
             break;
         case TOKEN_TRUE:
         case TOKEN_FALSE:
             node->type = primitive_types[TYPE_BOOL];
             node->literal.kind = L_BOOL;
-            node->literal.b_val = consume()->b_val;
+            node->literal.b_val = token->b_val;
             break;
         default:
-            error_at_token(tok(), "invalid Token `%s` while parsing expression",
-                    token_as_str(tok()->kind));
+            fatal("at line %d, col %d: invalid Token `%s` while parsing expression",
+                    token->line, token->col, token_as_str(token->kind));
     }
 
     push_expr_node(node);
@@ -242,7 +243,8 @@ static ASTNode *parse_conditional()
         case TOKEN_ELSE:
             node->cond_stmt.expr = NULL;
             break;
-        default: error_at_token(conditional, "invalid conditional");
+        default: fatal("at line %d, col %d: invalid conditional",
+                         conditional->line, conditional->col);
     }
 
     node->cond_stmt.body = parse_block(false);
@@ -251,12 +253,14 @@ static ASTNode *parse_conditional()
 
 static Type parse_type()
 {
-    char *type_name = expect(TOKEN_IDENTIFIER)->str.data;
+    Token *token = expect(TOKEN_IDENTIFIER);
+    char *type_name = token->str.data;
 
     // Search for type Symbol in current scope
     Symbol *type_sym = symbol_table_lookup(current_scope, type_name);
     if (!type_sym) 
-        error_at_token(tok(), "unknown type `%s`", type_name);
+        fatal("at line %d, col %d: unknown type `%s`",
+                token->line, token->col, type_name);
 
     return type_sym->type;
 }
@@ -281,7 +285,8 @@ static ASTNode *parse_variable_declaration(char *var_name)
     // Insert variable into current scope
     Symbol *var_sym = symbol_table_insert(current_scope, var_name, SYMBOL_VARIABLE);
     if (!var_sym) {
-        error_at_token(tok(), "variable `%s` redeclared in scope", var_name);
+        fatal("at line %d, col %d: variable `%s` redeclared in scope", 
+                line, col, var_name);
     }
     var_sym->is_constant = is_constant;
 
@@ -303,8 +308,9 @@ static ASTNode *parse_variable_declaration(char *var_name)
             Type decl_type = node->var_decl.type;
             Type assign_type = node->var_decl.init->type;
             if (!types_equal(decl_type, assign_type)) {
-                error_at(line, col, "variable assignment does not match variable type\n"
-                    "Variable(%s) != Assignment(%s)", decl_type.name, assign_type.name);
+                fatal("at line %d, col %d: variable assignment does not match variable type\n"
+                    "Variable of type `%s` != Assignment of type `%s`",
+                    line, col, decl_type.name, assign_type.name);
             }
 
             var_sym->type = node->var_decl.init->type;
@@ -330,7 +336,8 @@ static ASTNode *parse_variable_assignment(char *var_name)
     consume(); // consume `=`
 
     if (!symbol_table_lookup(current_scope, var_name)) {
-        error_at_token(tok(), "unknown Symbol `%s`", var_name);
+        fatal("at line %d, col %d: unknown Symbol `%s`",
+                line, col, var_name);
     }
 
     ASTNode *node = make_node(NODE_ASSIGN_STMT);
@@ -380,8 +387,8 @@ static ASTNode *parse_block(bool in_func_toplevel)
                         stmt = parse_variable_assignment(identifier);
                         break;
                     default:
-                        error_at_token(tok(), "invalid Token `%s` while parsing function body",
-                                token_as_str(tok()->kind));
+                        fatal("at line %d, col %d: invalid Token `%s` while parsing function body",
+                                tok()->line, tok()->col, token_as_str(tok()->kind));
                 }
                 break;
             case TOKEN_IF:
@@ -396,8 +403,8 @@ static ASTNode *parse_block(bool in_func_toplevel)
                 expect(TOKEN_SEMICOLON);
                 break;
             default:
-                error_at_token(tok(), "invalid Token `%s` while parsing function body",
-                        token_as_str(tok()->kind));
+                fatal("at line %d, col %d: invalid Token `%s` while parsing function body",
+                        tok()->line, tok()->col, token_as_str(tok()->kind));
         }
 
         if (!stmt) break;
@@ -431,7 +438,8 @@ static ASTNode *parse_function_declaration()
     // Insert function into current scope
     Symbol *func_sym = symbol_table_insert(current_scope, func_name, SYMBOL_FUNCTION);
     if (!func_sym)
-        error_at_token(tok(), "function `%s` redeclared in scope", func_name);
+        fatal("at line %d, col %d: function `%s` redeclared in scope", 
+                line, col, func_name);
 
     // Create function scope
     SymbolTable *func_scope = symbol_table_create(func_name);
@@ -457,7 +465,8 @@ static ASTNode *parse_function_declaration()
         // Add paramter to function scope as a variable
         Symbol *param_sym = symbol_table_insert(func_scope, param_name, SYMBOL_VARIABLE);
         if (!param_sym) {
-            error_at_token(tok(), "function parameter `%s` redeclared");
+            fatal("at line %d, col %d: function parameter `%s` redeclared",
+                    tok()->line, tok()->col, param_name);
         }
 
         // Parse type
@@ -517,8 +526,8 @@ ASTNode *parse(Vector tokens)
                 decl = parse_variable_declaration(consume()->str.data);
                 break;
             default:
-                error_at_token(tok(), "invalid Token `%s` while parsing top-level",
-                        token_as_str(tok()->kind));
+                fatal("at line %d, col %d: invalid Token `%s` while parsing top-level",
+                        tok()->line, tok()->col, token_as_str(tok()->kind));
         }
         cur = cur->next = decl;
     }
@@ -527,7 +536,7 @@ ASTNode *parse(Vector tokens)
     Symbol *entry_point = symbol_table_lookup(global_scope, "main");
     if (!entry_point || entry_point->kind != SYMBOL_FUNCTION) {
         LOG_ERROR("no `main` function was found!");
-        error("failed to compile.");
+        fatal("failed to compile.");
     }
 
     return ast.next;
@@ -621,7 +630,7 @@ void dump_ast(ASTNode *root, int level)
         case NODE_REF_EXPR:
             printf("[REF]: name = %s\n", root->ref);
             break;
-        default: error("invalid AST! (%d)", root->kind);
+        default: fatal("invalid AST! (%d)", root->kind);
     }
 
     dump_ast(root->next, level);
@@ -652,7 +661,7 @@ void dump_literal(Literal literal)
         case L_STRING:
             printf("%*s", (int)literal.s_len, literal.s_val);
             break;
-        default: error("invalid Literal! (%d)", literal.kind);
+        default: fatal("invalid Literal! (%d)", literal.kind);
     }
 }
 

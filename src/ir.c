@@ -10,6 +10,7 @@ struct IRBuilder
 {
     Table *var_names;
     Table *expressions;
+    int num_temporaries;
     BasicBlock *blocks;
     BasicBlock *current_block;
     int block_count;
@@ -100,19 +101,10 @@ static char *encode_instruction(IRBuilder *builder, Instruction *inst)
                 memcpy(encoded + size, operand.var, var_name_size);
                 size += var_name_size;
                 break;
-            default: error("cannot encode invalid OperandKind: %d", operand.kind);
+            default: fatal("cannot encode invalid OperandKind: %d", operand.kind);
         }
     }
     encoded[size] = 0;
-
-#ifdef DEBUG
-    printf("Encoded TAC: ");
-    for (size_t i = 0; i < size; i++) {
-        printf("%X ", encoded[i]);
-    }
-    printf("\n");
-#endif
-
     return encoded;
 }
 
@@ -120,7 +112,7 @@ static void add_instruction(IRBuilder *builder, Instruction *inst)
 {
     BasicBlock *current_block = builder->current_block;
     if (!current_block)
-        error("no block to add instruction to");
+        fatal("no block to add instruction to");
 
     if (inst->assignee) {
         char *encoded = encode_instruction(builder, inst);
@@ -144,7 +136,7 @@ static Instruction *previous_instruction(IRBuilder *builder)
 {
     BasicBlock *current_block = builder->current_block;
     if (!current_block)
-        error("no block to get previous instruction from");
+        fatal("no block to get previous instruction from");
 
     Instruction *inst = (Instruction *)vector_get(
             &current_block->instructions,
@@ -156,7 +148,7 @@ static Instruction *previous_instruction(IRBuilder *builder)
 static void add_operand(Instruction *inst, void *value, OperandKind kind)
 {
     if (inst->num_operands == MAX_OPERANDS)
-        error("too many operands for instruction %d", inst->opcode);
+        fatal("too many operands for instruction %d", inst->opcode);
 
     Operand operand = { .kind = kind };
     switch (operand.kind) {
@@ -169,7 +161,7 @@ static void add_operand(Instruction *inst, void *value, OperandKind kind)
         case OPERAND_LABEL:
             operand.label = (char *)value;
             break;
-        default: error("invalid OperandKind: %d", kind);
+        default: fatal("invalid OperandKind: %d", kind);
     }
 
     inst->operands[inst->num_operands++] = operand;
@@ -207,20 +199,19 @@ static void emit_function(IRBuilder *builder, FuncDecl func)
 static void emit_variable(IRBuilder *builder, VarDecl var)
 {
     Instruction *inst = make_instruction(OP_ASSIGN);
-    inst->assignee = var.name;
-
-    table_insert(builder->var_names, var.name, var.name);
-
     add_operands_from_node(builder, inst, var.init);
+
+    inst->assignee = var.name;
+    table_insert(builder->var_names, var.name, var.name);
     add_instruction(builder, inst);
 }
 
 static void emit_assignment(IRBuilder *builder, AssignStmt assign)
 {
     Instruction *inst = make_instruction(OP_ASSIGN);
-    inst->assignee = assign.name;
-
     add_operands_from_node(builder, inst, assign.value);
+
+    inst->assignee = assign.name;
     add_instruction(builder, inst);
 }
 
@@ -231,34 +222,25 @@ static void emit_return(IRBuilder *builder, RetStmt ret)
     add_instruction(builder, inst);
 }
 
-char *create_temporary_name(IRBuilder *builder)
+char *create_temporary(IRBuilder *builder)
 {
-    // Generate a random 6 character string for the temporary variable
-    char *temporary_name = NULL;
-
-    do {
-        temporary_name = rand_str(6);
-        if (!table_lookup(builder->var_names, temporary_name))
-            break;
-        free(temporary_name);
-    } while (!temporary_name);
-
+    int temporary_id = builder->num_temporaries++;
+    char *temporary_name = aprintf("$t%d", temporary_id);
     return temporary_name;
 }
 
 static void emit_unary(IRBuilder *builder, UnaryExpr unary)
 {
     Instruction *inst = make_instruction((OpCode)unary.un_op);
-    inst->assignee = create_temporary_name(builder);
-
     add_operands_from_node(builder, inst, unary.expr);
+
+    inst->assignee = create_temporary(builder);
     add_instruction(builder, inst);
 }
 
 static void emit_binary(IRBuilder *builder, BinaryExpr binary)
 {
     Instruction *inst = make_instruction((OpCode)binary.bin_op);
-    inst->assignee = create_temporary_name(builder);
 
     ASTNode *exprs[2] = {binary.lhs, binary.rhs};
     for (uint8_t i = 0; i < 2; i++) {
@@ -266,6 +248,7 @@ static void emit_binary(IRBuilder *builder, BinaryExpr binary)
         add_operands_from_node(builder, inst, expr);
     }
 
+    inst->assignee = create_temporary(builder);
     add_instruction(builder, inst);
 }
 
@@ -290,7 +273,7 @@ static ASTNode *emit(IRBuilder *builder, ASTNode *node)
             emit_assignment(builder, node->assign);
             break;
         case NODE_COND_STMT:
-            error("conditional translation to IR is not implemented yet");
+            fatal("conditional translation to IR is not implemented yet");
             break;
         case NODE_RET_STMT:
             emit_return(builder, node->ret_stmt);
@@ -304,7 +287,7 @@ static ASTNode *emit(IRBuilder *builder, ASTNode *node)
         case NODE_LITERAL_EXPR: // Leaf node
         case NODE_REF_EXPR:
             return node;
-        default: error("cannot emit IR from node: %d", node->kind);
+        default: fatal("cannot emit IR from node: %d", node->kind);
     }
 
     emit(builder, next);
@@ -344,7 +327,7 @@ void dump_operand(Operand operand)
         case OPERAND_LABEL:
             printf("%s", operand.label);
             break;
-        default: error("invalid OperandKind: %d", operand.kind);
+        default: fatal("invalid OperandKind: %d", operand.kind);
     }
 }
 
@@ -364,7 +347,7 @@ char *opcode_as_str(OpCode opcode)
         case OP_CMP_GT: return ">";
         case OP_CMP_LT_EQ: return "<=";
         case OP_CMP_GT_EQ: return ">=";
-        default: error("invalid OpCode %d", opcode);
+        default: fatal("invalid OpCode %d", opcode);
     }
     return "";
 }
@@ -410,7 +393,7 @@ void dump_instruction(Instruction *inst)
             printf("  ret ");
             dump_operand(inst->operands[0]);
             break;
-        default: error("invalid Instruction: %d", inst->opcode);
+        default: fatal("invalid Instruction: %d", inst->opcode);
     }
     printf("\n");
 }

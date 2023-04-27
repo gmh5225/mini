@@ -15,7 +15,7 @@ static void initialize_compiler_context()
 {
     global_scope = symbol_table_create("__GLOBAL__");
     if (!global_scope) {
-        error("couldn't allocate symbol table for global_scope!");
+        fatal("couldn't allocate symbol table for global_scope!");
     }
 
     // Add supported primitive types to global scope
@@ -31,7 +31,7 @@ int compile(MiniOpts opts)
     int status = 0;
     FILE *file = fopen(opts.input_filename, "rb");
     if (!file) {
-        error("couldn't open file `%s`", opts.input_filename);
+        fatal("couldn't open file `%s`", opts.input_filename);
     }
 
     initialize_compiler_context();
@@ -49,16 +49,15 @@ int compile(MiniOpts opts)
 
     // Semantic Analysis
     ASTNode *ast = parse(tokens);
-    if (opts.dump_flags & DUMP_AST) {
+    if (opts.dump_flags & DUMP_AST)
         dump_ast(ast, 0);
-    }
 
-    if (opts.dump_flags & DUMP_SYMBOLS) {
+    if (opts.dump_flags & DUMP_SYMBOLS)
         symbol_table_dump(global_scope, 0);
-    }
 
     // Optimization: Constant Folding
-    fold_constants(ast);
+    if (opts.optimize_flags & O_FOLD_CONSTANTS)
+        fold_constants(ast);
 
     // IR Translation
     Symbol *entry_point = symbol_table_lookup(global_scope, "main");

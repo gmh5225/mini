@@ -2,34 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void error(const char *fmt, ...)
+void fatal(const char *fmt, ...)
 {
     fprintf(stderr, "mini: ");
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-    fprintf(stderr, "\n");
-    exit(EXIT_FAILURE);
-}
-
-void error_at(int line, int col, const char *fmt, ...)
-{
-    fprintf(stderr, "mini: at line %d, col %d:\n ", line, col);
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-    fprintf(stderr, "\n");
-    exit(EXIT_FAILURE);
-}
-
-void error_at_token(Token *t, const char *fmt, ...)
-{
-    fprintf(stderr, "mini: at line %d, col %d: on token %s\n ",
-            t->line, t->col, (t->kind == TOKEN_IDENTIFIER)
-                ? t->str.data
-                : token_as_str(t->kind));
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
@@ -57,16 +32,29 @@ uint64_t hash(const char *s)
     return hash;
 }
 
+char *aprintf(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    int size = vsnprintf(NULL, 0, fmt, args);
+    va_end(args);
+    char *str = calloc(size + 1, sizeof(char));
+    va_start(args, fmt);
+    vsnprintf(str, size + 1, fmt, args);
+    va_end(args);
+    return str;
+}
+
 char *rand_str(size_t length)
 {
     static const char alphabet[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 #define ALPHABET_LENGTH sizeof(alphabet)/sizeof(alphabet[0])
-    char *result = calloc(length + 1, sizeof(char));
+    char *str = calloc(length + 1, sizeof(char));
     for (size_t i = 0; i < length; i++) {
         size_t index = rand() % ALPHABET_LENGTH;
-        result[i] = alphabet[index];
+        str[i] = alphabet[index];
     }
-    result[length] = 0;
-    return result;
+    str[length] = 0;
+    return str;
 #undef ALPHABET_LENGTH
 }

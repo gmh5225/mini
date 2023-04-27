@@ -82,7 +82,7 @@ static char next()
         fill_buffer();
     }
     else if (reached(END_OF_FILE)) {
-        error("lexer was expecting more characters but reached EOF! (next)");
+        fatal("lexer was expecting more characters but reached EOF! (next)");
     }
 
     char c = buf[pos];
@@ -104,7 +104,7 @@ static char peek()
         fill_buffer();
     }
     else if (reached(END_OF_FILE)) {
-        error("lexer was expected more characters but reached EOF! (peek)");
+        fatal("lexer was expected more characters but reached EOF! (peek)");
     }
     return buf[pos];
 }
@@ -140,7 +140,8 @@ static Token *lex_alphabetic()
         if (!is_alphanumeric(c) && c != '_') break;
 
         if (len >= IDENTIFIER_MAX_LEN) {
-            error_at(line, col, "identifier is too long (max = %d)", IDENTIFIER_MAX_LEN);
+            fatal("at line %d, col %d: identifier is too long (max = %d)",
+                    line, col, IDENTIFIER_MAX_LEN);
         }
 
         buf[len++] = c;
@@ -192,7 +193,8 @@ static Token *lex_numeric(bool is_negative)
         if (!is_numeric(c)) break;
 
         if (len >= NUMBER_MAX_LEN) {
-            error_at(line, col, "number is too long (max = %d)", NUMBER_MAX_LEN);
+            fatal("at line %d, col %d: number is too long (max = %d)",
+                    line, col, NUMBER_MAX_LEN);
         }
 
         buf[len++] = c;
@@ -295,7 +297,8 @@ Vector lex(FILE *file)
             case ')': sym = make_token(TOKEN_RPAREN); break;
             case '[': sym = make_token(TOKEN_LBRACKET); break;
             case ']': sym = make_token(TOKEN_RBRACKET); break;
-            default: error_at(sym_line, sym_col, "unknown symbol `%c`", c);
+            default: fatal("at line %d, col %d: unknown symbol `%c`",
+                             line, col, c);
         }
         sym->line = sym_line;
         sym->col = sym_col;

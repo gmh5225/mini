@@ -7,6 +7,7 @@ MiniOpts parse_mini_options(int argc, char **argv)
 {
     MiniOpts opts = {
         .dump_flags = 0,
+        .optimize_flags = DEFAULT_OPTIMIZATIONS,
         .input_filename = NULL,
         .output_filename = "a.out",
     };
@@ -19,38 +20,34 @@ MiniOpts parse_mini_options(int argc, char **argv)
 
         if (strcmp(arg, "-o") == 0) {
             if (i + 1 >= argc) {
-                error("not enough arguments for option '%s'", arg);
+                fatal("not enough arguments for option '%s'", arg);
             }
             opts.output_filename = argv[i + 1];
             skip = true;
-            continue;
         }
-
-        if (strcmp(arg, "-dT") == 0) {
+        else if (strcmp(arg, "-dT") == 0) {
             opts.dump_flags |= DUMP_TOKENS;
-            continue;
         }
-
-        if (strcmp(arg, "-dA") == 0) {
+        else if (strcmp(arg, "-dA") == 0) {
             opts.dump_flags |= DUMP_AST;
-            continue;
         }
-
-        if (strcmp(arg, "-dSY") == 0) {
+        else if (strcmp(arg, "-dSY") == 0) {
             opts.dump_flags |= DUMP_SYMBOLS;
-            continue;
         }
-
-        if (strcmp(arg, "-dIR") == 0) {
+        else if (strcmp(arg, "-dIR") == 0) {
             opts.dump_flags |= DUMP_IR;
-            continue;
         }
-
-        opts.input_filename = arg;
+        else if (strcmp(arg, "--no-fold") == 0) {
+            opts.optimize_flags ^= O_FOLD_CONSTANTS;
+            LOG_WARN("constant folding disabled.");
+        }
+        else {
+            opts.input_filename = arg;
+        }
     }
 
     if (!opts.input_filename) {
-        error("input file is required");
+        fatal("input file is required");
     }
 
     return opts;
