@@ -5,6 +5,10 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+#ifdef DEBUG
+#define UNUSED(x) (void)x
+#endif
+
 #define MAX(x, y) (x > y) ? x : y
 #define MIN(x, y) (x > y) ? y : x
 

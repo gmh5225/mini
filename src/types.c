@@ -10,6 +10,7 @@ const Type primitive_types[] =
         .name = "void",
         .align = 0,
         .size = 0,
+        .is_pointer = false,
     },
     [TYPE_INT] = {
         .kind = TYPE_INT,
@@ -17,6 +18,7 @@ const Type primitive_types[] =
         .name = "int",
         .align = 0,
         .size = sizeof(intmax_t),
+        .is_pointer = false,
     },
     [TYPE_UINT] = {
         .kind = TYPE_UINT,
@@ -24,6 +26,7 @@ const Type primitive_types[] =
         .name = "uint",
         .align = 0,
         .size = sizeof(uintmax_t),
+        .is_pointer = false,
     },
     [TYPE_FLOAT] = {
         .kind = TYPE_FLOAT,
@@ -31,6 +34,7 @@ const Type primitive_types[] =
         .name = "float",
         .align = 0,
         .size = sizeof(float),
+        .is_pointer = false,
     },
     [TYPE_DOUBLE] = {
         .kind = TYPE_DOUBLE,
@@ -38,6 +42,7 @@ const Type primitive_types[] =
         .name = "double",
         .align = 0,
         .size = sizeof(double),
+        .is_pointer = false,
     },
     [TYPE_CHAR] = {
         .kind = TYPE_CHAR,
@@ -45,6 +50,7 @@ const Type primitive_types[] =
         .name = "char",
         .align = 0,
         .size = sizeof(char),
+        .is_pointer = false,
     },
     [TYPE_BOOL] = {
         .kind = TYPE_BOOL,
@@ -52,5 +58,6 @@ const Type primitive_types[] =
         .name = "bool",
         .align = 0,
         .size = sizeof(bool),
+        .is_pointer = false,
     },
 };

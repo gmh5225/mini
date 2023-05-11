@@ -10,10 +10,10 @@ typedef struct SymbolTable SymbolTable;
 
 enum SymbolKind
 {
-    SYMBOL_UNKNOWN,
-    SYMBOL_VARIABLE,
-    SYMBOL_FUNCTION,
-    SYMBOL_TYPE,
+  SYMBOL_UNKNOWN,
+  SYMBOL_VARIABLE,
+  SYMBOL_FUNCTION,
+  SYMBOL_TYPE,
 };
 
 extern const char *symbol_strings[];
@@ -21,24 +21,24 @@ const char *symbol_as_str(SymbolKind kind);
 
 struct Symbol
 {
-    SymbolKind kind;
-    char *name;
-    bool is_constant;
-    bool is_initialized;
-    Type type;
-    ASTNode *node;
-    Symbol *next;
+  SymbolKind kind;
+  char *name;
+  bool is_constant;
+  bool is_initialized;
+  Type type;
+  Node *node;
+  Symbol *next;
 };
 
 #define SYMBOL_TABLE_SIZE 256
 
 struct SymbolTable
 {
-    char *name;
-    Symbol *symbols[SYMBOL_TABLE_SIZE];
-    SymbolTable *parent;
-    SymbolTable *child;
-    SymbolTable *next;
+  char *name;
+  Symbol *symbols[SYMBOL_TABLE_SIZE];
+  SymbolTable *parent;
+  SymbolTable *child;
+  SymbolTable *next;
 };
 
 SymbolTable *symbol_table_create(char *table_name);

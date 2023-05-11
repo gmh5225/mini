@@ -5,35 +5,29 @@
 
 enum
 { 
-    DUMP_TOKENS = 1 << 1, 
-    DUMP_AST = 1 << 2,
-    DUMP_SYMBOLS = 1 << 3,
-    DUMP_IR = 1 << 4,
+  DUMP_TOKENS = 1 << 1, 
+  DUMP_AST = 1 << 2,
+  DUMP_SYMBOLS = 1 << 3,
+  DUMP_IR = 1 << 4,
 };
 
 enum
 {
-    O_FOLD_CONSTANTS = 1 << 1,
+  O_FOLD_CONSTANTS = 1 << 1,
 };
 
 #define DEFAULT_OPTIMIZATIONS \
-    O_FOLD_CONSTANTS
+  O_FOLD_CONSTANTS
 
-typedef struct MiniOpts MiniOpts;
-struct MiniOpts
+typedef struct
 {
-    int dump_flags;
-    int optimize_flags;
-    char *input_filename;
-    char *output_filename;
-};
+  SymbolTable *global_scope;
+  TypeID registered_types;
+} CompilerContext;
 
-MiniOpts parse_mini_options(int argc, char **argv);
+void compiler_context_init();
+void compiler_context_free();
 
-int compile(MiniOpts opts);
-
-extern SymbolTable *global_scope;
-extern TypeID registered_types;
-
+extern CompilerContext *ctx;
 
 #endif

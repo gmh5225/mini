@@ -3,6 +3,6 @@
 
 #include "parse.h"
 
-void fold_constants(ASTNode *node);
+void fold_constants(Node *node);
 
 #endif
